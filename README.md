@@ -14,7 +14,7 @@ AI code is in models and matrixcalculations, so please check
 
 Also added by AI:
 
-!!The Doc is AI made becose my english is very Bad, Fixed in future!!
+!!The Doc is AI made because my english is very Bad, Fixed in future!!
 
 bits auf the layer system, and a bit of overall things i coud not to without.
 
