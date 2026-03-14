@@ -18,3 +18,5 @@ These docs cover dense, conv2d, and maxpool2d workflows across both low-level an
 - Most arrays are updated in-place through pointers.
 - Tensor layout for conv/pool APIs is flattened CHW (channel-major).
 - `examples/Other_Exaple.c` is a compact layer-array training demo.
+- `APIReference.md` is a complete function-by-function reference for all
+	public headers.

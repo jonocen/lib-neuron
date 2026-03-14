@@ -2,16 +2,19 @@
 
 `lib-neuron` is a lightweight C neural-network library focused on small projects and educational use.
 
-## Current features
+## Why AI and where is it
 
-- Dense layers with activation and backpropagation
-- Conv2D layers with configurable kernel/stride/padding
-- MaxPool2D layers with argmax-based backward pass
-- Sequential plugin model API
-- Loss functions: MSE and BCE
-- Optimizers: SGD, Adam, RMSProp
+i dont now a bit of the stuff thats needed but may you do, and i wanted to make it acceseble now
 
-## Public modules
+AI code is in models and matrixcalculations, so please check
+
+Also added by AI:
+
+!!The Doc is AI made because my english is very Bad, Fixed in future!!
+
+bits auf the layer system, and a bit of overall things i coud not to without.
+
+## Modules
 
 - `matrixcalculation`: activations, dense layers, conv2d, maxpool2d
 - `layers`: plugin wrappers (`LayerPlugin`) for sequential models
@@ -24,6 +27,20 @@ Include everything with:
 ```c
 #include <lib-neuron.h>
 ```
+
+## Project layout
+
+- `include/` — public headers
+- `src/` — implementations
+
+## Docs
+
+- `docs/README.md`
+- `docs/Quickstart.md`
+- `docs/Examples.md`
+- `docs/Training.md`
+- `docs/FirstScript.md`
+- `docs/APIReference.md`
 
 ## Return convention
 
@@ -57,30 +74,59 @@ make clean
 Build all:
 
 ```sh
-make examples
-```
-
-Run:
-
-```sh
-./examples/simple_compact
-./examples/sequential_xor_plugin
-./examples/Other_Exaple
-```
-
-## Compile your own program
-
-```sh
 gcc your_program.c -Iinclude -L. -lneuron -lm
 ```
 
-## Docs
+## Plugin layers + sequential model example
 
-- `docs/README.md`
-- `docs/Quickstart.md`
-- `docs/Examples.md`
-- `docs/FirstScript.md`
-- `docs/Training.md`
-- `docs/APIReference.md`
+A ready-to-run example was added in:
 
-`docs/APIReference.md` now includes detailed Conv2D and MaxPool2D API behavior, tensor layout rules, and sequential plugin notes.
+- `examples/sequential_xor_plugin.c`
+
+It shows how to:
+
+- initialize a `SequentialModel`
+- add dense plugin layers with `sequential_model_add_dense`
+- choose optimizer and loss at runtime
+- run inference with `sequential_model_forward`
+
+Build and run it with:
+
+```sh
+gcc examples/sequential_xor_plugin.c -Iinclude -L. -lneuron -lm -o examples/sequential_xor_plugin
+./examples/sequential_xor_plugin
+```
+
+Minimal usage pattern:
+
+```c
+SequentialModel model;
+float out[1];
+float loss = 0.0f;
+OptimizerType optimizer = OPTIMIZER_SGD;
+LossFunctionType loss_function = LOSS_BCE;
+float learning_rate = 0.05f;
+
+sequential_model_init(&model, 2);
+sequential_model_add_dense(&model, 2, 4, ACT_RELU);
+sequential_model_add_dense(&model, 4, 1, ACT_SIGMOID);
+
+sequential_model_train_step_with_loss(&model,
+									  input,
+									  target,
+									  out,
+									  loss_function,
+									  optimizer,
+									  learning_rate,
+									  NULL,
+									  &loss);
+sequential_model_forward(&model, input, out);
+
+sequential_model_free(&model);
+```
+
+`examples/Other_Exaple.c` is the advanced training example with a deeper network, selectable loss/optimizer, and evaluation metrics.
+
+## Contributing
+
+its a little bit of bad code, if you find a pice of code that is bad please contribute to this project or make a issue report on github. Thanks a lot!!!!

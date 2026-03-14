@@ -21,7 +21,8 @@ int main(void) {
         if (sequential_model_predict(&model, x[i], out) != 0) return 1;
         printf("[%g, %g] -> %.6f\n", x[i][0], x[i][1], out[0]);
     }
-
+    sequential_model_save_lnn(&model, "xor_model.lnn");
     sequential_model_free(&model);
+    
     return 0;
 }

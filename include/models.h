@@ -113,6 +113,21 @@ int sequential_model_predict(SequentialModel *model,
 							 float *output);
 
 /*
+ * Saves all layer weights and biases into a `.lnn` file.
+ * Returns 0 on success, -1 on invalid input or I/O failure.
+ */
+int sequential_model_save_lnn(const SequentialModel *model,
+						  const char *file_path);
+
+/*
+ * Loads all layer weights and biases from a `.lnn` file.
+ * The model architecture must match the file exactly.
+ * Returns 0 on success, -1 on invalid input, mismatch, or I/O failure.
+ */
+int sequential_model_load_lnn(SequentialModel *model,
+						  const char *file_path);
+
+/*
  * Compiles model training settings (loss, optimizer, learning rate).
  * For Adam and RMSProp, optimizer state/cache is allocated internally.
  * Returns 0 on success, -1 on invalid input or allocation failure.

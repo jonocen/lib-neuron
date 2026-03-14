@@ -1,7 +1,39 @@
 #include "../include/models.h"
 
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define LNN_MAGIC "LNN1"
+#define LNN_MAGIC_SIZE 4
+
+static int has_lnn_extension(const char *file_path) {
+    if (!file_path) return 0;
+
+    const char *dot = strrchr(file_path, '.');
+    if (!dot) return 0;
+
+    return strcmp(dot, ".lnn") == 0;
+}
+
+static void free_layer_snapshots(float **weights,
+                                 float **biases,
+                                 int num_layers) {
+    if (weights) {
+        for (int i = 0; i < num_layers; i++) {
+            free(weights[i]);
+        }
+        free(weights);
+    }
+
+    if (biases) {
+        for (int i = 0; i < num_layers; i++) {
+            free(biases[i]);
+        }
+        free(biases);
+    }
+}
 
 static int plugin_layer_valid(const LayerPlugin *layer) {
     if (!layer) return 0;
@@ -341,6 +373,144 @@ int sequential_model_predict(SequentialModel *model,
                              const float *input,
                              float *output) {
     return sequential_model_forward(model, input, output);
+}
+
+int sequential_model_save_lnn(const SequentialModel *model,
+                              const char *file_path) {
+    if (!model || !file_path || !model->layers || model->num_layers <= 0) return -1;
+    if (!has_lnn_extension(file_path)) return -1;
+
+    FILE *file = fopen(file_path, "wb");
+    if (!file) return -1;
+
+    uint32_t num_layers = (uint32_t)model->num_layers;
+
+    if (fwrite(LNN_MAGIC, 1, LNN_MAGIC_SIZE, file) != LNN_MAGIC_SIZE ||
+        fwrite(&num_layers, sizeof(num_layers), 1, file) != 1) {
+        fclose(file);
+        return -1;
+    }
+
+    for (int i = 0; i < model->num_layers; i++) {
+        const LayerPlugin *layer = &model->layers[i];
+        float *weights = layer->weights(layer->ctx);
+        float *biases = layer->biases(layer->ctx);
+        int weights_size = layer->weights_size(layer->ctx);
+        int biases_size = layer->biases_size(layer->ctx);
+
+        if (!weights || !biases || weights_size <= 0 || biases_size <= 0) {
+            fclose(file);
+            return -1;
+        }
+
+        uint32_t weights_size_u32 = (uint32_t)weights_size;
+        uint32_t biases_size_u32 = (uint32_t)biases_size;
+
+        if (fwrite(&weights_size_u32, sizeof(weights_size_u32), 1, file) != 1 ||
+            fwrite(&biases_size_u32, sizeof(biases_size_u32), 1, file) != 1 ||
+            fwrite(weights, sizeof(float), (size_t)weights_size, file) != (size_t)weights_size ||
+            fwrite(biases, sizeof(float), (size_t)biases_size, file) != (size_t)biases_size) {
+            fclose(file);
+            return -1;
+        }
+    }
+
+    if (fclose(file) != 0) return -1;
+    return 0;
+}
+
+int sequential_model_load_lnn(SequentialModel *model,
+                              const char *file_path) {
+    if (!model || !file_path || !model->layers || model->num_layers <= 0) return -1;
+    if (!has_lnn_extension(file_path)) return -1;
+
+    FILE *file = fopen(file_path, "rb");
+    if (!file) return -1;
+
+    char magic[LNN_MAGIC_SIZE];
+    uint32_t num_layers = 0;
+
+    if (fread(magic, 1, LNN_MAGIC_SIZE, file) != LNN_MAGIC_SIZE ||
+        fread(&num_layers, sizeof(num_layers), 1, file) != 1) {
+        fclose(file);
+        return -1;
+    }
+
+    if (memcmp(magic, LNN_MAGIC, LNN_MAGIC_SIZE) != 0 ||
+        num_layers != (uint32_t)model->num_layers) {
+        fclose(file);
+        return -1;
+    }
+
+    float **weights_snapshots = calloc((size_t)model->num_layers, sizeof(float *));
+    float **biases_snapshots = calloc((size_t)model->num_layers, sizeof(float *));
+    if (!weights_snapshots || !biases_snapshots) {
+        free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+        fclose(file);
+        return -1;
+    }
+
+    for (int i = 0; i < model->num_layers; i++) {
+        LayerPlugin *layer = &model->layers[i];
+        int expected_weights_size = layer->weights_size(layer->ctx);
+        int expected_biases_size = layer->biases_size(layer->ctx);
+        uint32_t file_weights_size = 0;
+        uint32_t file_biases_size = 0;
+
+        if (expected_weights_size <= 0 || expected_biases_size <= 0 ||
+            fread(&file_weights_size, sizeof(file_weights_size), 1, file) != 1 ||
+            fread(&file_biases_size, sizeof(file_biases_size), 1, file) != 1 ||
+            file_weights_size != (uint32_t)expected_weights_size ||
+            file_biases_size != (uint32_t)expected_biases_size) {
+            free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+            fclose(file);
+            return -1;
+        }
+
+        weights_snapshots[i] = malloc((size_t)expected_weights_size * sizeof(float));
+        biases_snapshots[i] = malloc((size_t)expected_biases_size * sizeof(float));
+        if (!weights_snapshots[i] || !biases_snapshots[i]) {
+            free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+            fclose(file);
+            return -1;
+        }
+
+        if (fread(weights_snapshots[i], sizeof(float), (size_t)expected_weights_size, file) != (size_t)expected_weights_size ||
+            fread(biases_snapshots[i], sizeof(float), (size_t)expected_biases_size, file) != (size_t)expected_biases_size) {
+            free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+            fclose(file);
+            return -1;
+        }
+    }
+
+    /* Reject files with trailing unexpected data. */
+    if (fgetc(file) != EOF) {
+        free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+        fclose(file);
+        return -1;
+    }
+
+    for (int i = 0; i < model->num_layers; i++) {
+        LayerPlugin *layer = &model->layers[i];
+        float *weights = layer->weights(layer->ctx);
+        float *biases = layer->biases(layer->ctx);
+        int weights_size = layer->weights_size(layer->ctx);
+        int biases_size = layer->biases_size(layer->ctx);
+
+        if (!weights || !biases || weights_size <= 0 || biases_size <= 0) {
+            free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+            fclose(file);
+            return -1;
+        }
+
+        memcpy(weights, weights_snapshots[i], (size_t)weights_size * sizeof(float));
+        memcpy(biases, biases_snapshots[i], (size_t)biases_size * sizeof(float));
+    }
+
+    free_layer_snapshots(weights_snapshots, biases_snapshots, model->num_layers);
+
+    if (fclose(file) != 0) return -1;
+    return 0;
 }
 
 int sequential_model_compile(SequentialModel *model,
