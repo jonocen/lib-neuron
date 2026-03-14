@@ -4,15 +4,7 @@
 
 ## Why AI and where is it
 
-i dont now a bit of the stuff thats needed but may you do, and i wanted to make it acceseble now
-
-AI code is in models and matrixcalculations, so please check
-
-Also added by AI:
-
 !!The Doc is AI made because my english is very Bad, Fixed in future!!
-
-bits auf the layer system, and a bit of overall things i coud not to without.
 
 ## Modules
 
