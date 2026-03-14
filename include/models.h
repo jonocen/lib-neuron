@@ -62,6 +62,34 @@ int sequential_model_add_dense(SequentialModel *model,
 							   Activation activation);
 
 /*
+ * Convenience helper for adding a Conv2D plugin layer.
+ * Input and output tensors are flattened in CHW order.
+ */
+int sequential_model_add_conv2d(SequentialModel *model,
+								int input_width,
+								int input_height,
+								int input_channels,
+								int output_channels,
+								int kernel_width,
+								int kernel_height,
+								int stride,
+								int padding,
+								Activation activation);
+
+/*
+ * Convenience helper for adding a MaxPool2D plugin layer.
+ * Input and output tensors are flattened in CHW order.
+ */
+int sequential_model_add_maxpool2d(SequentialModel *model,
+								   int input_width,
+								   int input_height,
+								   int channels,
+								   int pool_width,
+								   int pool_height,
+								   int stride,
+								   int padding);
+
+/*
  * Runs forward pass for all layers in a sequential model.
  * `output` must have at least output size of the last layer.
  * Returns 0 on success, -1 on invalid input or failure.

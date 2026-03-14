@@ -2,6 +2,8 @@
 
 Current examples are in `examples/`.
 
+The shipped examples currently focus on dense workflows. Conv2D/MaxPool2D APIs are available and shown below as a minimal snippet.
+
 ## Build all examples
 
 ```sh
@@ -74,3 +76,26 @@ What it demonstrates:
 - dynamic `SequentialModel`
 - plugin dense layers via `sequential_model_add_dense`
 - framework-style flow: `sequential_model_compile` + `sequential_model_train` + `sequential_model_predict`
+
+## Conv2D + MaxPool2D snippet
+
+```c
+SequentialModel model;
+float output[10];
+
+sequential_model_init(&model, 5);
+sequential_model_add_conv2d(&model, 32, 32, 1, 8, 3, 3, 1, 1, ACT_RELU);
+sequential_model_add_maxpool2d(&model, 32, 32, 8, 2, 2, 2, 0);
+sequential_model_add_conv2d(&model, 16, 16, 8, 16, 3, 3, 1, 1, ACT_RELU);
+sequential_model_add_maxpool2d(&model, 16, 16, 16, 2, 2, 2, 0);
+sequential_model_add_dense(&model, 8 * 8 * 16, 10, ACT_SIGMOID);
+
+sequential_model_randomize(&model, 0.1f);
+sequential_model_forward(&model, image_chw_flat, output);
+```
+
+Notes:
+
+- Input/output tensors for conv and pool are flattened CHW.
+- You must provide correct dimensions between layers.
+- MaxPool2D has no trainable weights, but remains fully compatible with the training pipeline.

@@ -52,14 +52,13 @@ int main(void) {
         sequential_model_free(&model);
         return 1;
     }
-    printf("loss=%f, out=%f\n", loss, output[0]);
 
     /* Inference */
     if (sequential_model_predict(&model, input[0], output) != 0) {
         sequential_model_free(&model);
         return 1;
     }
-    printf("prediction=%f\n", output[0]);
+    printf("loss=%f, prediction=%f\n", loss, output[0]);
 
     sequential_model_free(&model);
     return 0;
@@ -87,4 +86,5 @@ gcc my_first_nn.c -Iinclude -L. -lneuron -lm -o my_first_nn
 - Switch optimizer with `OPTIMIZER_SGD` / `OPTIMIZER_ADAM` / `OPTIMIZER_RMSPROP`.
 - Switch loss with `LOSS_MSE` / `LOSS_BCE`.
 - Use `sequential_model_compile` + `sequential_model_train` for the shortest training flow.
+- Add feature extraction with `sequential_model_add_conv2d` and `sequential_model_add_maxpool2d`.
 - Check full working examples in `examples/`.

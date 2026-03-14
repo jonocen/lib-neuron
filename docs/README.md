@@ -2,7 +2,7 @@
 
 Welcome to the `lib-neuron` docs.
 
-The docs now cover both optimizer and loss selection in model helpers.
+These docs cover dense, conv2d, and maxpool2d workflows across both low-level and sequential APIs.
 
 ## Topics
 
@@ -16,4 +16,5 @@ The docs now cover both optimizer and loss selection in model helpers.
 
 - API returns `0` on success and `-1` on invalid input/failure.
 - Most arrays are updated in-place through pointers.
+- Tensor layout for conv/pool APIs is flattened CHW (channel-major).
 - `examples/Other_Exaple.c` is a compact layer-array training demo.

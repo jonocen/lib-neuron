@@ -210,6 +210,74 @@ int sequential_model_add_dense(SequentialModel *model,
     return 0;
 }
 
+int sequential_model_add_conv2d(SequentialModel *model,
+                                int input_width,
+                                int input_height,
+                                int input_channels,
+                                int output_channels,
+                                int kernel_width,
+                                int kernel_height,
+                                int stride,
+                                int padding,
+                                Activation activation) {
+    LayerPlugin layer;
+    memset(&layer, 0, sizeof(LayerPlugin));
+
+    if (!model) return -1;
+
+    if (layer_plugin_conv2d_create(input_width,
+                                   input_height,
+                                   input_channels,
+                                   output_channels,
+                                   kernel_width,
+                                   kernel_height,
+                                   stride,
+                                   padding,
+                                   activation,
+                                   &layer) != 0) {
+        return -1;
+    }
+
+    if (sequential_model_add_layer(model, layer) != 0) {
+        layer_plugin_free(&layer);
+        return -1;
+    }
+
+    return 0;
+}
+
+int sequential_model_add_maxpool2d(SequentialModel *model,
+                                   int input_width,
+                                   int input_height,
+                                   int channels,
+                                   int pool_width,
+                                   int pool_height,
+                                   int stride,
+                                   int padding) {
+    LayerPlugin layer;
+    memset(&layer, 0, sizeof(LayerPlugin));
+
+    if (!model) return -1;
+
+    if (layer_plugin_maxpool2d_create(input_width,
+                                      input_height,
+                                      channels,
+                                      pool_width,
+                                      pool_height,
+                                      stride,
+                                      padding,
+                                      &layer) != 0) {
+        return -1;
+    }
+
+    if (sequential_model_add_layer(model, layer) != 0) {
+        layer_plugin_free(&layer);
+        return -1;
+    }
+
+    return 0;
+}
+
 int sequential_model_forward(SequentialModel *model,
                              const float *input,
                              float *output) {

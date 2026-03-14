@@ -4,7 +4,7 @@ This page explains the training flow in `lib-neuron`.
 
 ## Core pieces
 
-- `matrixcalculation`: `layer_forward`, `layer_backward`
+- `matrixcalculation`: `layer_forward`, `layer_backward`, `conv2d_layer_forward`, `maxpool2d_layer_forward`
 - `lossfunctions`: `loss_mse`, `loss_mse_grad`, `loss_bce`, `loss_bce_grad`
 - `optimizers`: `sgd_optimizer`, `adam_optimizer`, `rmsprop_optimizer`
 - `models`: sequential helpers
@@ -26,6 +26,11 @@ Framework-style workflow:
 - `sequential_model_compile`
 - `sequential_model_train`
 - `sequential_model_predict`
+
+Conv/pool model building helpers:
+
+- `sequential_model_add_conv2d`
+- `sequential_model_add_maxpool2d`
 
 ## Built-in sequential training
 
@@ -111,6 +116,8 @@ Both do this sequence each step:
 4. Backpropagate layer-by-layer
 5. Update weights/biases with the selected optimizer
 
+For maxpool layers, there are no trainable parameters. Backward still propagates gradients to the input positions selected by max pooling.
+
 SGD compatibility wrappers still exist:
 
 - `sequential_train_step_sgd`
@@ -185,3 +192,15 @@ Keep RMSProp caches persistent across all training steps.
 - For XOR examples: `SGD` works well near `0.05f`, while `Adam` and `RMSProp` are often stable near `0.005f`.
 - If training stalls near 0.5 predictions, test different seeds/init scale.
 - BCE can work better than MSE for sigmoid-based binary outputs.
+
+## Conv2D/MaxPool2D shape tips
+
+- All conv and pool tensors are flattened CHW (`channel`, `height`, `width`).
+- Conv2D output shape:
+	- `out_w = ((in_w + 2 * padding - kernel_w) / stride) + 1`
+	- `out_h = ((in_h + 2 * padding - kernel_h) / stride) + 1`
+- MaxPool2D output shape:
+	- `out_w = ((in_w + 2 * padding - pool_w) / stride) + 1`
+	- `out_h = ((in_h + 2 * padding - pool_h) / stride) + 1`
+- Dimension checks are strict. If `(in + 2*padding - kernel_or_pool)` is not divisible by `stride`, layer creation returns `-1`.
+- When connecting to dense layers, flatten to `out_w * out_h * out_channels` (for conv) or `out_w * out_h * channels` (for pool).

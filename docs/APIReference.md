@@ -1,612 +1,535 @@
 # API Reference
 
-This page documents every public function in `lib-neuron` and explains the role of each parameter.
+This document describes the public API exposed by `lib-neuron` headers.
 
-## Return codes
+It is written as a practical reference:
 
-Most functions use this convention:
+- exact signatures grouped by header
+- tensor/shape rules
+- ownership and lifetime expectations
+- common failure conditions (`-1` cases)
+- compact usage patterns
 
-- `0` means success
-- `-1` means invalid input and/or internal failure
+## Return Convention
 
-Loss functions return `float` values directly.
+For most non-loss APIs:
 
-## Naming conventions
+- `0` = success
+- `-1` = invalid input and/or internal failure
 
-Model training helpers use these patterns:
+For loss value APIs:
+
+- returns `float`
+
+## Data and Layout Conventions
+
+Dense layout:
+
+- vectors are flat arrays of length `N`
+
+Conv2D and MaxPool2D layout:
+
+- flattened CHW (`channel`, `height`, `width`)
+- flattened index order is channel-major
+
+Conv2D output shape:
+
+- `out_w = ((in_w + 2 * padding - kernel_w) / stride) + 1`
+- `out_h = ((in_h + 2 * padding - kernel_h) / stride) + 1`
+
+MaxPool2D output shape:
+
+- `out_w = ((in_w + 2 * padding - pool_w) / stride) + 1`
+- `out_h = ((in_h + 2 * padding - pool_h) / stride) + 1`
+
+Important:
+
+- shape divisions above must be exact
+- invalid geometry returns `-1`
+
+## Ownership and Lifetime
+
+- `layer_init`, `conv2d_layer_init`, `maxpool2d_layer_init` allocate internal buffers.
+- matching `*_free` functions release those buffers.
+- plugin constructors (`layer_plugin_*_create`) allocate plugin context and transfer ownership to `LayerPlugin`.
+- always release plugin layers with `layer_plugin_free`.
+- `SequentialModel` owns layers added via `sequential_model_add_layer` and convenience add helpers.
+
+## Naming Patterns in Training Helpers
 
 - `*_with_loss`: runtime-selectable loss (`LOSS_MSE` or `LOSS_BCE`)
-- `*_mse` / `*_bce`: explicit named wrappers
-- no suffix (for example `sequential_train_step`): compatibility helper defaulting to MSE
+- `*_mse`, `*_bce`: fixed-loss wrapper
+- no suffix (`sequential_model_train_step`, `sequential_train_step`): compatibility helper using MSE
 
-## Common types
+## Core Types
 
-### `Activation`
+### `Activation` (`include/matrixcalculation.h`)
 
-Defined in `include/matrixcalculation.h`.
+- `ACT_LINEAR`
+- `ACT_RELU`
+- `ACT_SIGMOID`
+- `ACT_TANH`
 
-- `ACT_LINEAR`: no nonlinearity
-- `ACT_RELU`: `max(0, x)`
-- `ACT_SIGMOID`: `1 / (1 + exp(-x))`
-- `ACT_TANH`: hyperbolic tangent
-
-### `Layer`
-
-Dense layer with cached values used for backprop.
+### `Layer` (Dense)
 
 Fields:
 
-- `input_size`: number of inputs
-- `output_size`: number of neurons
-- `activation`: neuron activation type
-- `weights`: flattened `[output_size * input_size]` matrix
-- `biases`: `[output_size]`
-- `cache_input`: last forward input, used by backward
-- `cache_z`: last pre-activation values, used by backward
+- `input_size`
+- `output_size`
+- `activation`
+- `weights` (`[output_size * input_size]`)
+- `biases` (`[output_size]`)
+- `cache_input` (`[input_size]`)
+- `cache_z` (`[output_size]`)
 
-### `LayerPlugin`
+### `Conv2DLayer`
 
-Plugin interface used by `SequentialModel`.
+Fields include geometry, parameters, and caches:
 
-- `ctx`: plugin-owned context object
-- `forward`, `backward`: function pointers for pass operations
-- `input_size`, `output_size`: dynamic shape getters
-- `weights`, `biases`: parameter pointer getters
-- `weights_size`, `biases_size`: parameter length getters
-- `destroy`: cleanup function for `ctx`
+- input geometry: `input_width`, `input_height`, `input_channels`
+- output channels: `output_channels`
+- kernel: `kernel_width`, `kernel_height`
+- geometry: `stride`, `padding`
+- derived output geometry: `output_width`, `output_height`
+- activation: `activation`
+- parameters:
+  - `weights` (`[out_c * in_c * kernel_h * kernel_w]`)
+  - `biases` (`[out_c]`)
+- caches:
+  - `cache_input`
+  - `cache_z`
 
-### `OptimizerType`
+### `MaxPool2DLayer`
 
-Defined in `include/optimizers.h`.
+Fields include geometry and argmax cache:
+
+- input geometry: `input_width`, `input_height`, `channels`
+- pooling window: `pool_width`, `pool_height`
+- geometry: `stride`, `padding`
+- derived output geometry: `output_width`, `output_height`
+- caches:
+  - `cache_input`
+  - `cache_max_indices`
+
+Compatibility note:
+
+- maxpool has no trainable weights conceptually
+- internal dummy parameter slots (`dummy_weight`, `dummy_bias`) exist for generic plugin training-pipeline compatibility
+
+### `LayerPlugin` (`include/layers.h`)
+
+Function-pointer interface used by `SequentialModel`:
+
+- `forward`
+- `backward`
+- `input_size`, `output_size`
+- `weights`, `biases`
+- `weights_size`, `biases_size`
+- `destroy`
+
+### `OptimizerType` (`include/optimizers.h`)
 
 - `OPTIMIZER_SGD`
 - `OPTIMIZER_ADAM`
 - `OPTIMIZER_RMSPROP`
 
-### `LossFunctionType`
-
-Defined in `include/lossfunctions.h`.
+### `LossFunctionType` (`include/lossfunctions.h`)
 
 - `LOSS_MSE`
 - `LOSS_BCE`
 
-### `SequentialModel`
+### `AdamOptimizerState` (`include/models.h`)
 
-Dynamic container of plugin layers.
+Used by sequential/layer-array optimizer helpers.
 
-- `layers`: dynamic array of `LayerPlugin`
-- `num_layers`: current number of layers
-- `capacity`: allocated plugin slots
+Adam mode:
 
-### `AdamOptimizerState`
+- `m_w`, `v_w`, `m_b`, `v_b`
+- `step`
+- `beta1`, `beta2`
 
-Persistent state for Adam used by sequential helpers.
+RMSProp mode (reusing same struct):
 
-This same struct is also reused for RMSProp in sequential helpers:
+- uses `m_w`, `m_b` as caches
+- uses `beta1` as RMSProp decay
+- ignores `v_w`, `v_b`, `step` for RMSProp updates
 
-- `m_w` / `m_b` are used as RMSProp caches
-- `beta1` is used as RMSProp decay
-- `v_w` / `v_b` / `step` are ignored by RMSProp updates
+### `SequentialTrainConfig` (`include/models.h`)
 
-- `m_w`: first moment vectors for each layer weights
-- `v_w`: second moment vectors for each layer weights
-- `m_b`: first moment vectors for each layer biases
-- `v_b`: second moment vectors for each layer biases
-- `step`: global optimization step, starts at `1` and increments each update
-- `beta1`: first-moment decay, usually `0.9f`
-- `beta2`: second-moment decay, usually `0.999f`
+- `loss_function`
+- `optimizer`
+- `learning_rate`
+- `adam_state`
 
-### `SequentialTrainConfig`
+## Header: `matrixcalculation.h`
 
-Compact training config for sequential model helpers.
+### Activation API
 
-- `loss_function`: `LOSS_MSE` or `LOSS_BCE`
-- `optimizer`: `OPTIMIZER_SGD`, `OPTIMIZER_ADAM`, or `OPTIMIZER_RMSPROP`
-- `learning_rate`: step size
-- `adam_state`: `NULL` for SGD, required for Adam and RMSProp
+`float act_apply(float x, Activation a)`
 
-## `matrixcalculation.h`
+- applies activation to scalar `x`
 
-### `float act_apply(float x, Activation a)`
+`float act_deriv(float x, Activation a)`
 
-Applies activation function `a` to scalar `x`.
+- returns derivative at scalar `x`
 
-Parameters:
+### Dense Layer API
 
-- `x`: input scalar
-- `a`: activation type to apply
+`int layer_init(Layer *layer, int input_size, int output_size, Activation activation)`
 
-Returns:
+- allocates internal dense buffers
+- expected sizes:
+  - weights: `output_size * input_size`
+  - biases: `output_size`
+- returns `-1` for invalid sizes or allocation failure
 
-- activated scalar value
+`void layer_free(Layer *layer)`
 
-### `float act_deriv(float x, Activation a)`
+- releases all dense buffers
+- safe on partially initialized layers
 
-Computes derivative of activation `a` at scalar `x`.
+`int layer_forward(Layer *layer, const float *input, float *output)`
 
-Parameters:
+- input shape: `[input_size]`
+- output shape: `[output_size]`
+- caches current input and pre-activation `z`
 
-- `x`: input scalar (for layer code this is usually pre-activation `z`)
-- `a`: activation type
+`int layer_backward(const Layer *layer, const float *delta_in, float *delta_out, float *grad_w, float *grad_b)`
 
-Returns:
+- `delta_in`: `[output_size]`
+- `delta_out`: `[input_size]` or `NULL`
+- `grad_w`: `[output_size * input_size]`
+- `grad_b`: `[output_size]`
+- applies activation derivative using cached `cache_z`
 
-- derivative value at `x`
+### Conv2D API
 
-### `int layer_init(Layer *layer, int input_size, int output_size, Activation activation)`
+`int conv2d_layer_init(Conv2DLayer *layer, int input_width, int input_height, int input_channels, int output_channels, int kernel_width, int kernel_height, int stride, int padding, Activation activation)`
 
-Allocates and initializes a dense layer and all internal buffers.
+- validates geometry and divisibility
+- computes `output_width` and `output_height`
+- allocates parameters and caches
+- returns `-1` for invalid geometry or allocation failure
 
-Parameters:
+`void conv2d_layer_free(Conv2DLayer *layer)`
 
-- `layer`: output layer object to initialize
-- `input_size`: number of input features
-- `output_size`: number of output neurons
-- `activation`: activation used by this layer
+- frees conv2d buffers
 
-Returns:
+`int conv2d_layer_forward(Conv2DLayer *layer, const float *input, float *output)`
 
-- `0` on success, `-1` on invalid input/allocation failure
+- input shape: `[in_c * in_h * in_w]` in CHW
+- output shape: `[out_c * out_h * out_w]` in CHW
+- operation: convolution + bias + activation
 
-### `void layer_free(Layer *layer)`
+`int conv2d_layer_backward(const Conv2DLayer *layer, const float *delta_in, float *delta_out, float *grad_w, float *grad_b)`
 
-Frees memory owned by a layer.
+- `delta_in`: `[out_c * out_h * out_w]`
+- `delta_out`: `[in_c * in_h * in_w]` or `NULL`
+- `grad_w`: `[out_c * in_c * kernel_h * kernel_w]`
+- `grad_b`: `[out_c]`
+- computes gradients and optional propagated delta
 
-Parameters:
+### MaxPool2D API
 
-- `layer`: layer to clean up (safe to call with partially initialized layer)
+`int maxpool2d_layer_init(MaxPool2DLayer *layer, int input_width, int input_height, int channels, int pool_width, int pool_height, int stride, int padding)`
 
-### `int layer_forward(Layer *layer, const float *input, float *output)`
+- validates geometry and divisibility
+- computes output dimensions
+- allocates input and argmax caches
+- returns `-1` on invalid geometry or allocation failure
 
-Forward pass for one dense layer.
+`void maxpool2d_layer_free(MaxPool2DLayer *layer)`
 
-Parameters:
+- frees maxpool buffers
 
-- `layer`: initialized layer instance
-- `input`: pointer to `[input_size]`
-- `output`: pointer to `[output_size]` where activations are written
+`int maxpool2d_layer_forward(MaxPool2DLayer *layer, const float *input, float *output)`
 
-Returns:
+- input shape: `[c * in_h * in_w]` in CHW
+- output shape: `[c * out_h * out_w]` in CHW
+- stores winning input indices into `cache_max_indices`
 
-- `0` on success, `-1` on invalid input
+`int maxpool2d_layer_backward(const MaxPool2DLayer *layer, const float *delta_in, float *delta_out, float *grad_w, float *grad_b)`
 
-### `int layer_backward(const Layer *layer, const float *delta_in, float *delta_out, float *grad_w, float *grad_b)`
+- routes each output gradient element back to its cached argmax source index
+- `delta_in`: `[c * out_h * out_w]`
+- `delta_out`: `[c * in_h * in_w]` or `NULL`
+- `grad_w` and `grad_b` are required by plugin interface but are dummy outputs for maxpool
 
-Backward pass for one layer.
+## Header: `layers.h`
 
-Parameters:
+### Plugin constructors
 
-- `layer`: layer with valid forward caches (`cache_input`, `cache_z`)
-- `delta_in`: upstream gradient for this layer outputs, size `[output_size]`
-- `delta_out`: optional downstream gradient for previous layer inputs, size `[input_size]` or `NULL` for first layer
-- `grad_w`: output buffer for weight gradients, size `[output_size * input_size]`
-- `grad_b`: output buffer for bias gradients, size `[output_size]`
+`int layer_plugin_dense_create(int input_size, int output_size, Activation activation, LayerPlugin *out_plugin)`
 
-Returns:
+- creates dense plugin context
+- wires callback table
 
-- `0` on success, `-1` on invalid input/allocation failure
+`int layer_plugin_conv2d_create(int input_width, int input_height, int input_channels, int output_channels, int kernel_width, int kernel_height, int stride, int padding, Activation activation, LayerPlugin *out_plugin)`
 
-## `layers.h`
+- creates conv2d plugin context
+- CHW flattened input/output
 
-### `int layer_plugin_dense_create(int input_size, int output_size, Activation activation, LayerPlugin *out_plugin)`
+`int layer_plugin_maxpool2d_create(int input_width, int input_height, int channels, int pool_width, int pool_height, int stride, int padding, LayerPlugin *out_plugin)`
 
-Creates a dense plugin layer backed by `Layer`.
+- creates maxpool2d plugin context
+- CHW flattened input/output
 
-Parameters:
+All plugin constructors:
 
-- `input_size`: input dimension
-- `output_size`: output dimension
-- `activation`: activation function
-- `out_plugin`: output plugin object receiving function pointers and context
+- return `0` on success, `-1` on invalid input/allocation failure
+- transfer context ownership into `out_plugin`
 
-Returns:
+### Plugin cleanup
 
-- `0` on success, `-1` on failure
+`void layer_plugin_free(LayerPlugin *plugin)`
 
-### `void layer_plugin_free(LayerPlugin *plugin)`
+- calls `plugin->destroy(plugin->ctx)` if present
+- sets pointers to `NULL`
 
-Frees plugin context and resets function pointers.
+## Header: `lossfunctions.h`
 
-Parameters:
+`float loss_mse(const float *pred, const float *target, int size)`
 
-- `plugin`: plugin to release
+- computes mean squared error over `size`
 
-## `lossfunctions.h`
+`int loss_mse_grad(const float *pred, const float *target, int size, float *grad_out)`
 
-### `float loss_mse(const float *pred, const float *target, int size)`
+- writes gradient with respect to `pred`
 
-Mean Squared Error over `size` elements.
+`float loss_bce(const float *pred, const float *target, int size)`
 
-Parameters:
+- computes binary cross-entropy over `size`
 
-- `pred`: prediction vector
-- `target`: expected vector
-- `size`: number of elements
+`int loss_bce_grad(const float *pred, const float *target, int size, float *grad_out)`
 
-Returns:
+- writes BCE gradient with respect to `pred`
 
-- average MSE value
+Expected for all loss APIs:
 
-### `int loss_mse_grad(const float *pred, const float *target, int size, float *grad_out)`
+- `pred`, `target`, and `grad_out` (where used) must be valid pointers
+- vector length is `size`
 
-Gradient of MSE with respect to predictions.
+## Header: `optimizers.h`
 
-Parameters:
+`int sgd_optimizer(float *weights, float *grads, float learning_rate, int size)`
 
-- `pred`: prediction vector
-- `target`: expected vector
-- `size`: number of elements
-- `grad_out`: output gradient buffer of size `[size]`
+- in-place SGD parameter update
 
-Returns:
+`int adam_optimizer(float *weights, float *grads, float *m, float *v, float beta1, float beta2, float learning_rate, int t, int size)`
 
-- `0` on success, `-1` on invalid input
+- in-place Adam update with bias correction step `t`
 
-### `float loss_bce(const float *pred, const float *target, int size)`
+`int rmsprop_optimizer(float *weights, float *grads, float *cache, float beta, float learning_rate, int size)`
 
-Binary Cross-Entropy over `size` elements.
+- in-place RMSProp update
 
-Parameters:
+For all optimizers:
 
-- `pred`: prediction probabilities in `[0, 1]`
-- `target`: target labels/probabilities
-- `size`: number of elements
+- pointers must be valid
+- `size > 0`
+- learning rate must be positive
 
-Returns:
+## Header: `models.h`
 
-- average BCE value
+### `SequentialModel` lifecycle
 
-### `int loss_bce_grad(const float *pred, const float *target, int size, float *grad_out)`
+`int sequential_model_init(SequentialModel *model, int initial_capacity)`
 
-Gradient of BCE with respect to predictions.
+- allocates plugin array
+- `initial_capacity` must be `> 0`
 
-Parameters:
+`void sequential_model_free(SequentialModel *model)`
 
-- `pred`: prediction probabilities in `[0, 1]`
-- `target`: target labels/probabilities
-- `size`: number of elements
-- `grad_out`: output gradient buffer of size `[size]`
+- frees owned plugin layers
+- releases compiled optimizer state if internally owned
 
-Returns:
+### Layer composition helpers
 
-- `0` on success, `-1` on invalid input
+`int sequential_model_add_layer(SequentialModel *model, LayerPlugin layer)`
 
-## `optimizers.h`
+- takes ownership of `layer`
+- validates callback set
+- grows internal capacity as needed
 
-### `int adam_optimizer(float *weights, float *grads, float *m, float *v, float beta1, float beta2, float learning_rate, int t, int size)`
+`int sequential_model_add_dense(SequentialModel *model, int input_size, int output_size, Activation activation)`
 
-Applies one Adam update to parameter vector.
+`int sequential_model_add_conv2d(SequentialModel *model, int input_width, int input_height, int input_channels, int output_channels, int kernel_width, int kernel_height, int stride, int padding, Activation activation)`
 
-Parameters:
+`int sequential_model_add_maxpool2d(SequentialModel *model, int input_width, int input_height, int channels, int pool_width, int pool_height, int stride, int padding)`
 
-- `weights`: parameter vector updated in place, size `[size]`
-- `grads`: gradient vector for current step, size `[size]`
-- `m`: first-moment buffer (persistent), size `[size]`
-- `v`: second-moment buffer (persistent), size `[size]`
-- `beta1`: first-moment decay, typically `0.9f`
-- `beta2`: second-moment decay, typically `0.999f`
-- `learning_rate`: optimizer step size
-- `t`: 1-based optimization step for bias correction
-- `size`: number of parameters
+All add helpers:
 
-Returns:
+- create plugin layer and append to model
+- return `-1` on invalid inputs or allocation failure
 
-- `0` on success, `-1` on invalid input
+Dimension chaining is manual. Example:
 
-### `int sgd_optimizer(float *weights, float *grads, float learning_rate, int size)`
+- `conv: 28x28x1 -> 28x28x8` with `k=3, s=1, p=1`
+- `pool: 28x28x8 -> 14x14x8` with `2x2, s=2`
+- dense input must then be `14 * 14 * 8`
 
-Applies one SGD update to parameter vector.
+### Inference and initialization
 
-Parameters:
+`int sequential_model_forward(SequentialModel *model, const float *input, float *output)`
 
-- `weights`: parameter vector updated in place, size `[size]`
-- `grads`: gradient vector for current step, size `[size]`
-- `learning_rate`: optimizer step size
-- `size`: number of parameters
+- runs forward through every plugin layer
 
-Returns:
+`int sequential_model_predict(SequentialModel *model, const float *input, float *output)`
 
-- `0` on success, `-1` on invalid input
+- alias to `sequential_model_forward`
 
-### `int rmsprop_optimizer(float *weights, float *grads, float *cache, float beta, float learning_rate, int size)`
+`int sequential_model_randomize(SequentialModel *model, float init_scale)`
 
-Applies one RMSProp update to parameter vector.
+- randomizes each layer's parameter buffers
+- maxpool dummy parameter buffers are also touched for uniform pipeline behavior
 
-Parameters:
+### Compiled train loop API
 
-- `weights`: parameter vector updated in place, size `[size]`
-- `grads`: gradient vector for current step, size `[size]`
-- `cache`: RMSProp squared-gradient cache (persistent), size `[size]`
-- `beta`: decay factor, typically `0.9f`
-- `learning_rate`: optimizer step size
-- `size`: number of parameters
+`int sequential_model_compile(SequentialModel *model, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, float adam_beta1, float adam_beta2)`
 
-Returns:
+- stores selected loss/optimizer/rate in model
+- allocates optimizer state internally for Adam and RMSProp
 
-- `0` on success, `-1` on invalid input
+`int sequential_model_train(SequentialModel *model, const float *inputs, const float *targets, int num_samples, int input_size, int target_size, int epochs, float *final_loss_out)`
 
-## `models.h`
+- loops epochs and samples with compiled settings
+- expected batch layout:
+  - `inputs`: `[num_samples * input_size]` contiguous row-major
+  - `targets`: `[num_samples * target_size]` contiguous row-major
 
-### `int sequential_model_init(SequentialModel *model, int initial_capacity)`
+### External optimizer-state helpers
 
-Initializes an empty dynamic sequential model.
+`int sequential_model_adam_state_init(SequentialModel *model, AdamOptimizerState *out_state, float beta1, float beta2)`
 
-Parameters:
+- allocates per-layer state buffers
+- `out_state` should be empty (`NULL` pointers / zeroed fields)
 
-- `model`: model object to initialize
-- `initial_capacity`: initial slot count for plugin layers
+`void sequential_model_adam_state_free(SequentialModel *model, AdamOptimizerState *state)`
 
-Returns:
+- releases buffers created by state init
 
-- `0` on success, `-1` on invalid input/allocation failure
+### Config-driven one-step API
 
-### `void sequential_model_free(SequentialModel *model)`
+`void sequential_train_config_init_sgd(SequentialTrainConfig *cfg, LossFunctionType loss_function, float learning_rate)`
 
-Frees all layers and internal memory of `SequentialModel`.
+`void sequential_train_config_init_adam(SequentialTrainConfig *cfg, LossFunctionType loss_function, float learning_rate, AdamOptimizerState *adam_state)`
 
-Parameters:
+`int sequential_model_train_step_cfg(SequentialModel *model, const float *input, const float *target, float *output, const SequentialTrainConfig *cfg, float *loss_out)`
 
-- `model`: model to clean up
+- compact repeated training interface
 
-### `int sequential_model_add_layer(SequentialModel *model, LayerPlugin layer)`
+### Plugin-sequential training helpers
 
-Adds plugin layer to model.
+`int sequential_model_train_step_sgd(SequentialModel *model, const float *input, const float *target, float *output, float learning_rate, float *loss_out)`
 
-Parameters:
+`int sequential_model_train_step(SequentialModel *model, const float *input, const float *target, float *output, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-- `model`: destination sequential model
-- `layer`: plugin layer to move into model ownership
+`int sequential_model_train_step_with_loss(SequentialModel *model, const float *input, const float *target, float *output, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Returns:
+`int sequential_model_train_step_mse(SequentialModel *model, const float *input, const float *target, float *output, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-- `0` on success, `-1` on invalid input/allocation failure
+`int sequential_model_train_step_bce(SequentialModel *model, const float *input, const float *target, float *output, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `int sequential_model_add_dense(SequentialModel *model, int input_size, int output_size, Activation activation)`
+Notes:
 
-Convenience API to create and append one dense layer plugin.
+- these perform forward + loss + backward + parameter update in one call
+- for `OPTIMIZER_ADAM` and `OPTIMIZER_RMSPROP`, valid optimizer state is required
+- `loss_out` may be `NULL`
 
-Parameters:
+### Plugin-sequential optimize-from-prediction helpers
 
-- `model`: destination sequential model
-- `input_size`: dense layer input dimension
-- `output_size`: dense layer output dimension
-- `activation`: dense layer activation
+`int sequential_model_optimize_from_prediction(SequentialModel *model, const float *prediction, const float *target, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Returns:
+`int sequential_model_optimize_from_prediction_with_loss(SequentialModel *model, const float *prediction, const float *target, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-- `0` on success, `-1` on failure
+`int sequential_model_optimize_from_prediction_mse(SequentialModel *model, const float *prediction, const float *target, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `int sequential_model_forward(SequentialModel *model, const float *input, float *output)`
+`int sequential_model_optimize_from_prediction_bce(SequentialModel *model, const float *prediction, const float *target, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Runs forward pass across all plugin layers in model.
+Use when you already called `sequential_model_forward` and want split forward/optimize phases.
 
-Parameters:
+### Layer-array inference and training API
 
-- `model`: model containing at least one layer
-- `input`: input vector for first layer
-- `output`: output vector for last layer (caller-provided buffer)
+`int sequential_forward(Layer *layers, int num_layers, const float *input, float *output)`
 
-Returns:
+`int sequential_train_step_sgd(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, float learning_rate, float *loss_out)`
 
-- `0` on success, `-1` on invalid input/failure
+`int sequential_train_step(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `int sequential_model_predict(SequentialModel *model, const float *input, float *output)`
+`int sequential_train_step_with_loss(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Alias for `sequential_model_forward`.
+`int sequential_train_step_mse(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `int sequential_model_compile(SequentialModel *model, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, float adam_beta1, float adam_beta2)`
+`int sequential_train_step_bce(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Stores training settings inside model and allocates optimizer state internally when needed (Adam and RMSProp).
+`int sequential_optimize_from_prediction(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `int sequential_model_train(SequentialModel *model, const float *inputs, const float *targets, int num_samples, int input_size, int target_size, int epochs, float *final_loss_out)`
+`int sequential_optimize_from_prediction_with_loss(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Runs repeated training using settings from `sequential_model_compile`.
+`int sequential_optimize_from_prediction_mse(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-### `void sequential_train_config_init_sgd(SequentialTrainConfig *cfg, LossFunctionType loss_function, float learning_rate)`
+`int sequential_optimize_from_prediction_bce(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
 
-Initializes a config for SGD training.
+For layer-array APIs, caller responsibilities:
 
-### `void sequential_train_config_init_adam(SequentialTrainConfig *cfg, LossFunctionType loss_function, float learning_rate, AdamOptimizerState *adam_state)`
+- allocate all `grads_w[i]` and `grads_b[i]`
+- ensure each gradient buffer matches that layer's dense dimensions
+- keep optimizer state persistent across steps for Adam/RMSProp
 
-Initializes a config for Adam training.
+## Practical Failure Checklist (`-1`)
 
-### `int sequential_model_adam_state_init(SequentialModel *model, AdamOptimizerState *out_state, float beta1, float beta2)`
+Common causes across APIs:
 
-Allocates Adam state buffers based on model layer sizes.
+- null required pointers
+- non-positive sizes
+- invalid conv/pool geometry
+- output/input shape mismatch between chained layers
+- missing optimizer state for Adam/RMSProp helpers
+- allocation failure
 
-### `void sequential_model_adam_state_free(SequentialModel *model, AdamOptimizerState *state)`
+## Minimal End-to-End Snippets
 
-Frees Adam state buffers created by `sequential_model_adam_state_init`.
+### Dense-only sequential
 
-### `int sequential_model_train_step_cfg(SequentialModel *model, const float *input, const float *target, float *output, const SequentialTrainConfig *cfg, float *loss_out)`
+```c
+SequentialModel model;
+float out[1];
 
-Compact one-call training helper driven by `SequentialTrainConfig`.
+sequential_model_init(&model, 2);
+sequential_model_add_dense(&model, 2, 4, ACT_RELU);
+sequential_model_add_dense(&model, 4, 1, ACT_SIGMOID);
+sequential_model_randomize(&model, 0.1f);
+sequential_model_forward(&model, input_vec, out);
+sequential_model_free(&model);
+```
 
-### `int sequential_model_train_step_sgd(SequentialModel *model, const float *input, const float *target, float *output, float learning_rate, float *loss_out)`
+### Conv2D + MaxPool2D + Dense sequential
 
-Legacy convenience helper for one MSE + SGD step.
+```c
+SequentialModel model;
+float logits[10];
 
-Parameters:
+sequential_model_init(&model, 4);
+sequential_model_add_conv2d(&model, 28, 28, 1, 8, 3, 3, 1, 1, ACT_RELU);
+sequential_model_add_maxpool2d(&model, 28, 28, 8, 2, 2, 2, 0);
+sequential_model_add_dense(&model, 14 * 14 * 8, 10, ACT_SIGMOID);
 
-- `model`: sequential model
-- `input`: input vector
-- `target`: expected output vector
-- `output`: output buffer receiving current prediction
-- `learning_rate`: SGD learning rate
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
+sequential_model_randomize(&model, 0.1f);
+sequential_model_forward(&model, image_chw_flat, logits);
+sequential_model_free(&model);
+```
 
-Returns:
+### Split forward and optimize phase
 
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_model_train_step(SequentialModel *model, const float *input, const float *target, float *output, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-One-call training helper (forward + backward + update) using MSE and selected optimizer.
-
-Parameters:
-
-- `model`: sequential model
-- `input`: input vector
-- `target`: expected output vector
-- `output`: output buffer for current prediction
-- `optimizer`: `OPTIMIZER_SGD`, `OPTIMIZER_ADAM`, or `OPTIMIZER_RMSPROP`
-- `learning_rate`: learning rate for selected optimizer
-- `adam_state`: required for `OPTIMIZER_ADAM` and `OPTIMIZER_RMSPROP`, ignored for `OPTIMIZER_SGD`
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_model_train_step_with_loss(SequentialModel *model, const float *input, const float *target, float *output, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-One-call helper with selectable loss and optimizer.
-
-Parameters:
-
-- `loss_function`: `LOSS_MSE` or `LOSS_BCE`
-- all other parameters match `sequential_model_train_step`
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_model_train_step_mse(...)`
-
-Named wrapper for `sequential_model_train_step_with_loss(..., LOSS_MSE, ...)`.
-
-### `int sequential_model_train_step_bce(...)`
-
-Named wrapper for `sequential_model_train_step_with_loss(..., LOSS_BCE, ...)`.
-
-### `int sequential_model_optimize_from_prediction(SequentialModel *model, const float *prediction, const float *target, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-Backward + update only, intended after explicit `sequential_model_forward`.
-
-Parameters:
-
-- `model`: sequential model with valid cached activations from latest forward
-- `prediction`: latest model output (from corresponding forward pass)
-- `target`: expected output vector
-- `optimizer`: `OPTIMIZER_SGD`, `OPTIMIZER_ADAM`, or `OPTIMIZER_RMSPROP`
-- `learning_rate`: learning rate for selected optimizer
-- `adam_state`: required for `OPTIMIZER_ADAM` and `OPTIMIZER_RMSPROP`, ignored for `OPTIMIZER_SGD`
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_model_optimize_from_prediction_with_loss(SequentialModel *model, const float *prediction, const float *target, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-Backward+update with selectable loss after explicit forward pass.
-
-### `int sequential_model_optimize_from_prediction_mse(...)`
-
-Named wrapper for `sequential_model_optimize_from_prediction_with_loss(..., LOSS_MSE, ...)`.
-
-### `int sequential_model_optimize_from_prediction_bce(...)`
-
-Named wrapper for `sequential_model_optimize_from_prediction_with_loss(..., LOSS_BCE, ...)`.
-
-### `int sequential_forward(Layer *layers, int num_layers, const float *input, float *output)`
-
-Forward pass for array-of-`Layer` API.
-
-Parameters:
-
-- `layers`: pointer to first layer in stack
-- `num_layers`: number of layers in stack
-- `input`: input vector for first layer
-- `output`: output vector for last layer
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_train_step_sgd(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, float learning_rate, float *loss_out)`
-
-Legacy one-call training helper using MSE + SGD.
-
-Parameters:
-
-- `layers`: layer stack
-- `num_layers`: number of layers
-- `input`: input vector
-- `target`: expected output vector
-- `output`: output buffer for current prediction
-- `grads_w`: per-layer weight gradient buffers
-- `grads_b`: per-layer bias gradient buffers
-- `learning_rate`: SGD learning rate
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_train_step(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-One-call training helper (forward + backward + update) for array-of-`Layer` API.
-
-Parameters:
-
-- `layers`: layer stack
-- `num_layers`: number of layers
-- `input`: input vector
-- `target`: expected output vector
-- `output`: output buffer for current prediction
-- `grads_w`: per-layer weight gradient buffers (caller-allocated)
-- `grads_b`: per-layer bias gradient buffers (caller-allocated)
-- `optimizer`: `OPTIMIZER_SGD`, `OPTIMIZER_ADAM`, or `OPTIMIZER_RMSPROP`
-- `learning_rate`: learning rate for selected optimizer
-- `adam_state`: required for `OPTIMIZER_ADAM` and `OPTIMIZER_RMSPROP`, ignored for `OPTIMIZER_SGD`
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_train_step_with_loss(Layer *layers, int num_layers, const float *input, const float *target, float *output, float **grads_w, float **grads_b, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-One-call helper with selectable loss and optimizer for array-of-`Layer` API.
-
-### `int sequential_train_step_mse(...)`
-
-Named wrapper for `sequential_train_step_with_loss(..., LOSS_MSE, ...)`.
-
-### `int sequential_train_step_bce(...)`
-
-Named wrapper for `sequential_train_step_with_loss(..., LOSS_BCE, ...)`.
-
-### `int sequential_optimize_from_prediction(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-Backward + update only for array-of-`Layer` API, intended after `sequential_forward`.
-
-Parameters:
-
-- `layers`: layer stack with valid forward caches
-- `num_layers`: number of layers
-- `prediction`: latest model output from corresponding forward pass
-- `target`: expected output vector
-- `grads_w`: per-layer weight gradient buffers
-- `grads_b`: per-layer bias gradient buffers
-- `optimizer`: `OPTIMIZER_SGD`, `OPTIMIZER_ADAM`, or `OPTIMIZER_RMSPROP`
-- `learning_rate`: learning rate for selected optimizer
-- `adam_state`: required for `OPTIMIZER_ADAM` and `OPTIMIZER_RMSPROP`, ignored for `OPTIMIZER_SGD`
-- `loss_out`: optional pointer receiving MSE loss (`NULL` to ignore)
-
-Returns:
-
-- `0` on success, `-1` on invalid input/failure
-
-### `int sequential_optimize_from_prediction_with_loss(Layer *layers, int num_layers, const float *prediction, const float *target, float **grads_w, float **grads_b, LossFunctionType loss_function, OptimizerType optimizer, float learning_rate, AdamOptimizerState *adam_state, float *loss_out)`
-
-Backward+update with selectable loss after explicit forward pass.
-
-### `int sequential_optimize_from_prediction_mse(...)`
-
-Named wrapper for `sequential_optimize_from_prediction_with_loss(..., LOSS_MSE, ...)`.
-
-### `int sequential_optimize_from_prediction_bce(...)`
-
-Named wrapper for `sequential_optimize_from_prediction_with_loss(..., LOSS_BCE, ...)`.
+```c
+float loss = 0.0f;
+sequential_model_forward(&model, input_vec, output_vec);
+sequential_model_optimize_from_prediction_with_loss(&model,
+                                                    output_vec,
+                                                    target_vec,
+                                                    LOSS_BCE,
+                                                    OPTIMIZER_ADAM,
+                                                    0.001f,
+                                                    &adam_state,
+                                                    &loss);
+```

@@ -36,6 +36,36 @@ int layer_plugin_dense_create(int input_size,
                               LayerPlugin *out_plugin);
 
 /*
+ * Creates a Conv2D layer plugin backed by `Conv2DLayer`.
+ * Input and output buffers are flattened in CHW order.
+ * Returns 0 on success, -1 on invalid geometry or allocation failure.
+ */
+int layer_plugin_conv2d_create(int input_width,
+                               int input_height,
+                               int input_channels,
+                               int output_channels,
+                               int kernel_width,
+                               int kernel_height,
+                               int stride,
+                               int padding,
+                               Activation activation,
+                               LayerPlugin *out_plugin);
+
+/*
+ * Creates a MaxPool2D layer plugin backed by `MaxPool2DLayer`.
+ * Input and output buffers are flattened in CHW order.
+ * Returns 0 on success, -1 on invalid geometry or allocation failure.
+ */
+int layer_plugin_maxpool2d_create(int input_width,
+                                  int input_height,
+                                  int channels,
+                                  int pool_width,
+                                  int pool_height,
+                                  int stride,
+                                  int padding,
+                                  LayerPlugin *out_plugin);
+
+/*
  * Frees resources owned by the plugin and resets function pointers.
  * Safe to call on partially initialized plugins.
  */
