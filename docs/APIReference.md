@@ -402,10 +402,6 @@ Stores training settings inside model and allocates optimizer state internally w
 
 Runs repeated training using settings from `sequential_model_compile`.
 
-### `int sequential_model_fit(...)`
-
-Backward-compatible alias for `sequential_model_train`.
-
 ### `void sequential_train_config_init_sgd(SequentialTrainConfig *cfg, LossFunctionType loss_function, float learning_rate)`
 
 Initializes a config for SGD training.

@@ -369,24 +369,6 @@ int sequential_model_train(SequentialModel *model,
     return 0;
 }
 
-int sequential_model_fit(SequentialModel *model,
-                         const float *inputs,
-                         const float *targets,
-                         int num_samples,
-                         int input_size,
-                         int target_size,
-                         int epochs,
-                         float *final_loss_out) {
-    return sequential_model_train(model,
-                                  inputs,
-                                  targets,
-                                  num_samples,
-                                  input_size,
-                                  target_size,
-                                  epochs,
-                                  final_loss_out);
-}
-
 void sequential_train_config_init_sgd(SequentialTrainConfig *cfg,
                                       LossFunctionType loss_function,
                                       float learning_rate) {

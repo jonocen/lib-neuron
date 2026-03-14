@@ -62,7 +62,7 @@ sequential_train_config_init_adam(&cfg, LOSS_BCE, 0.005f, &adam);
 sequential_model_train_step_cfg(&model, input, target, output, &cfg, &loss);
 ```
 
-Compile/fit/predict pattern:
+Compile/train/predict pattern:
 
 ```c
 sequential_model_compile(&model, LOSS_MSE, OPTIMIZER_SGD, 0.05f, 0.9f, 0.999f);

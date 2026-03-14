@@ -113,18 +113,6 @@ int sequential_model_train(SequentialModel *model,
 					   float *final_loss_out);
 
 /*
- * Backward-compatible alias for `sequential_model_train`.
- */
-int sequential_model_fit(SequentialModel *model,
-					 const float *inputs,
-					 const float *targets,
-					 int num_samples,
-					 int input_size,
-					 int target_size,
-					 int epochs,
-					 float *final_loss_out);
-
-/*
  * Initializes a train config for SGD and selected loss.
  */
 void sequential_train_config_init_sgd(SequentialTrainConfig *cfg,
