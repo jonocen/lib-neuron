@@ -11,12 +11,7 @@ int main(void) {
     if (sequential_model_init(&model, 2) != 0 ||
         sequential_model_add_dense(&model, 2, 4, ACT_RELU) != 0 ||
         sequential_model_add_dense(&model, 4, 1, ACT_SIGMOID) != 0) return 1;
-
-    for (int l = 0; l < model.num_layers; l++) {
-        float *w = model.layers[l].weights(model.layers[l].ctx);
-        int nw = model.layers[l].weights_size(model.layers[l].ctx);
-        for (int i = 0; i < nw; i++) w[i] = ((float)rand() / RAND_MAX - 0.5f) * 0.2f;
-    }
+        sequential_model_randomize(&model, 0.4f);
 
     if (sequential_model_compile(&model, LOSS_MSE, OPTIMIZER_ADAM, 0.005f, 0.9f, 0.999f) != 0) return 1;
     if (sequential_model_train(&model, &x[0][0], &y[0][0], 4, 2, 1, 10000, &loss) != 0) return 1;
