@@ -10,7 +10,7 @@ From project root:
 make
 ```
 
-This produces `libneuron.a`.
+This produces `libneuron.a` and `libneuron.so`.
 
 ## 2) Build all examples from root
 
@@ -53,7 +53,7 @@ Conv/pool buffers are flattened in CHW order.
 ## 5) Compile your own program
 
 ```sh
-gcc your_program.c -Iinclude -L. -lneuron -lm
+gcc your_program.c -Iinclude ./libneuron.a -lm -o your_program
 ```
 
 Include all public APIs with:

@@ -22,7 +22,7 @@ EXAMPLE_BINARIES := $(patsubst examples/%.c,examples/%,$(wildcard examples/*.c))
 all: CFLAGS += $(RELEASE)
 all: lib
 
-lib: static
+lib: static shared
 
 static: $(LIB)
 

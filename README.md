@@ -51,13 +51,13 @@ Array data (weights, gradients, activations) is updated in place via pointers.
 
 ## Build
 
-Build static library:
+Build libraries (static + shared):
 
 ```sh
 make
 ```
 
-Build shared library:
+Build shared library only:
 
 ```sh
 make shared
@@ -69,12 +69,12 @@ Clean artifacts:
 make clean
 ```
 
-## Build and run examples
+## Compile your own program
 
-Build all:
+Use the static archive directly for the simplest setup:
 
 ```sh
-gcc your_program.c -Iinclude -L. -lneuron -lm
+gcc your_program.c -Iinclude ./libneuron.a -lm -o your_program
 ```
 
 ## Plugin layers + sequential model example
@@ -93,7 +93,7 @@ It shows how to:
 Build and run it with:
 
 ```sh
-gcc examples/sequential_xor_plugin.c -Iinclude -L. -lneuron -lm -o examples/sequential_xor_plugin
+make sequential_xor_plugin
 ./examples/sequential_xor_plugin
 ```
 

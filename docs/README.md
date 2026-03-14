@@ -17,6 +17,5 @@ These docs cover dense, conv2d, and maxpool2d workflows across both low-level an
 - API returns `0` on success and `-1` on invalid input/failure.
 - Most arrays are updated in-place through pointers.
 - Tensor layout for conv/pool APIs is flattened CHW (channel-major).
-- `examples/Other_Exaple.c` is a compact layer-array training demo.
-- `APIReference.md` is a complete function-by-function reference for all
-	public headers.
+- `examples/Other_Exaple.c` is a compact layer-array training demo (name kept as-is to match the current filename/target).
+- `APIReference.md` is a complete function-by-function reference for all public headers.

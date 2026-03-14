@@ -10,7 +10,7 @@ From project root:
 make
 ```
 
-This creates `libneuron.a`.
+This creates `libneuron.a` and `libneuron.so`.
 
 ## 2) Create your first script
 
@@ -48,6 +48,7 @@ int main(void) {
                                2,
                                1,
                                10,
+                               1,
                                &loss) != 0) {
         sequential_model_free(&model);
         return 1;
@@ -70,7 +71,7 @@ int main(void) {
 From project root:
 
 ```sh
-gcc my_first_nn.c -Iinclude -L. -lneuron -lm -o my_first_nn
+gcc my_first_nn.c -Iinclude ./libneuron.a -lm -o my_first_nn
 ```
 
 ## 4) Run
