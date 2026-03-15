@@ -11,6 +11,7 @@
 - `matrixcalculation`: activations, dense layers, conv2d, maxpool2d
 - `layers`: plugin wrappers (`LayerPlugin`) for sequential models
 - `models`: sequential training/inference helpers
+- `image_processing`: PGM loading, dataset helpers, image-oriented train/predict wrappers
 - `lossfunctions`: MSE/BCE losses and gradients
 - `optimizers`: SGD/Adam/RMSProp/Adagrad/AdamW updates
 
@@ -44,6 +45,8 @@ Model APIs are split into focused headers while keeping compatibility:
 - `docs/AddLayerAndPluginLayer.md`
 - `docs/FirstScript.md`
 - `docs/APIReference.md`
+
+For image-based training examples (including loading many files into arrays), see `docs/Training.md`.
 
 ## Return convention
 

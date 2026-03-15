@@ -3,6 +3,7 @@
 Welcome to the `lib-neuron` docs.
 
 These docs cover dense, conv2d, and maxpool2d workflows across both low-level and sequential APIs.
+They also cover image data helpers for loading PGM files and training from in-memory image datasets.
 
 ## Topics
 

@@ -40,6 +40,11 @@ typedef struct {
     float           *work_grad_b;
     int              work_grad_w_size;
     int              work_grad_b_size;
+    /* Tracked 2D feature-map shape for convenience conv/pool builders. */
+    int              shape2d_width;
+    int              shape2d_height;
+    int              shape2d_channels;
+    int              shape2d_valid;
 } SequentialModel;
 
 typedef struct {

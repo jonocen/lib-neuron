@@ -66,6 +66,14 @@ int layer_plugin_maxpool2d_create(int input_width,
                                   LayerPlugin *out_plugin);
 
 /*
+ * Creates a Flatten plugin layer for already-contiguous tensors.
+ * This is an identity transform in memory layout, useful as an explicit
+ * model graph step between conv/pool stacks and dense heads.
+ */
+int layer_plugin_flatten_create(int size,
+                                LayerPlugin *out_plugin);
+
+/*
  * Frees resources owned by the plugin and resets function pointers.
  * Safe to call on partially initialized plugins.
  */

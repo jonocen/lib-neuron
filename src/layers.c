@@ -1,6 +1,13 @@
 #include "../include/layers.h"
 
 #include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    int size;
+    float dummy_weight;
+    float dummy_bias;
+} FlattenLayer;
 
 static int dense_forward(void *ctx, const float *input, float *output) {
     return layer_forward((Layer *)ctx, input, output);
@@ -142,6 +149,61 @@ static void maxpool2d_destroy(void *ctx) {
     free(layer);
 }
 
+static int flatten_forward(void *ctx, const float *input, float *output) {
+    const FlattenLayer *layer = (const FlattenLayer *)ctx;
+    if (!layer || !input || !output || layer->size <= 0) return -1;
+    memcpy(output, input, (size_t)layer->size * sizeof(float));
+    return 0;
+}
+
+static int flatten_backward(const void *ctx,
+                           const float *delta_in,
+                           float       *delta_out,
+                           float       *grad_w,
+                           float       *grad_b) {
+    const FlattenLayer *layer = (const FlattenLayer *)ctx;
+    if (!layer || !delta_in || !grad_w || !grad_b || layer->size <= 0) return -1;
+
+    grad_w[0] = 0.0f;
+    grad_b[0] = 0.0f;
+
+    if (delta_out) {
+        memcpy(delta_out, delta_in, (size_t)layer->size * sizeof(float));
+    }
+    return 0;
+}
+
+static int flatten_input_size(const void *ctx) {
+    return ((const FlattenLayer *)ctx)->size;
+}
+
+static int flatten_output_size(const void *ctx) {
+    return ((const FlattenLayer *)ctx)->size;
+}
+
+static float *flatten_weights(void *ctx) {
+    return &((FlattenLayer *)ctx)->dummy_weight;
+}
+
+static float *flatten_biases(void *ctx) {
+    return &((FlattenLayer *)ctx)->dummy_bias;
+}
+
+static int flatten_weights_size(const void *ctx) {
+    (void)ctx;
+    return 1;
+}
+
+static int flatten_biases_size(const void *ctx) {
+    (void)ctx;
+    return 1;
+}
+
+static void flatten_destroy(void *ctx) {
+    FlattenLayer *layer = (FlattenLayer *)ctx;
+    free(layer);
+}
+
 int layer_plugin_dense_create(int input_size,
                               int output_size,
                               Activation activation,
@@ -248,6 +310,33 @@ int layer_plugin_maxpool2d_create(int input_width,
     out_plugin->weights_size = maxpool2d_weights_size;
     out_plugin->biases_size = maxpool2d_biases_size;
     out_plugin->destroy = maxpool2d_destroy;
+
+    return 0;
+}
+
+int layer_plugin_flatten_create(int size,
+                                LayerPlugin *out_plugin) {
+    FlattenLayer *layer;
+
+    if (!out_plugin || size <= 0) return -1;
+
+    layer = calloc(1, sizeof(FlattenLayer));
+    if (!layer) return -1;
+
+    layer->size = size;
+    layer->dummy_weight = 0.0f;
+    layer->dummy_bias = 0.0f;
+
+    out_plugin->ctx = layer;
+    out_plugin->forward = flatten_forward;
+    out_plugin->backward = flatten_backward;
+    out_plugin->input_size = flatten_input_size;
+    out_plugin->output_size = flatten_output_size;
+    out_plugin->weights = flatten_weights;
+    out_plugin->biases = flatten_biases;
+    out_plugin->weights_size = flatten_weights_size;
+    out_plugin->biases_size = flatten_biases_size;
+    out_plugin->destroy = flatten_destroy;
 
     return 0;
 }

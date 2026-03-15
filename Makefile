@@ -9,19 +9,20 @@ SRC := src/matrixcalculation.c \
 	src/layers.c \
        src/lossfunctions.c \
        src/optimizers.c \
+	src/image_processing.c \
 	src/models_internal.c \
 	src/models_core.c \
 	src/models_train.c \
 	src/models_state.c \
 	src/models_legacy.c
 
-OBJ := matrixcalculation.o layers.o lossfunctions.o optimizers.o models_internal.o models_core.o models_train.o models_state.o models_legacy.o
-PIC_OBJ := matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o models_internal.pic.o models_core.pic.o models_train.pic.o models_state.pic.o models_legacy.pic.o
+OBJ := matrixcalculation.o layers.o lossfunctions.o optimizers.o image_processing.o models_internal.o models_core.o models_train.o models_state.o models_legacy.o
+PIC_OBJ := matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o image_processing.pic.o models_internal.pic.o models_core.pic.o models_train.pic.o models_state.pic.o models_legacy.pic.o
 LIB := libneuron.a
 SHARED_LIB := libneuron.so
 EXAMPLE_BINARIES := $(patsubst examples/%.c,examples/%,$(wildcard examples/*.c))
 
-.PHONY: all lib static shared debug clean examples sequential_xor_plugin Other_Exaple simple_compact
+.PHONY: all lib static shared debug clean examples sequential_xor_plugin Other_Exaple simple_compact mnist_tiny_pgm
 
 all: CFLAGS += $(RELEASE)
 all: lib
@@ -53,6 +54,9 @@ layers.o: src/layers.c include/layers.h include/matrixcalculation.h
 optimizers.o: src/optimizers.c include/optimizers.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
+image_processing.o: src/image_processing.c include/image_processing.h include/models.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
 models_internal.o: src/models_internal.c include/models_internal.h include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -78,6 +82,9 @@ layers.pic.o: src/layers.c include/layers.h include/matrixcalculation.h
 	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
 
 optimizers.pic.o: src/optimizers.c include/optimizers.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+image_processing.pic.o: src/image_processing.c include/image_processing.h include/models.h
 	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
 
 models_internal.pic.o: src/models_internal.c include/models_internal.h include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
@@ -109,3 +116,6 @@ Other_Exaple: lib
 
 simple_compact: lib
 	$(MAKE) -C examples simple_compact
+
+mnist_tiny_pgm: lib
+	$(MAKE) -C examples mnist_tiny_pgm

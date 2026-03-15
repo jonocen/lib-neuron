@@ -10,6 +10,7 @@ extern "C" {
 #include "lossfunctions.h"
 #include "optimizers.h"
 #include "models.h"
+#include "image_processing.h"
 
 #ifdef __cplusplus
 }

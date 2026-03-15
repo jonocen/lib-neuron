@@ -10,6 +10,21 @@
 #define LNN_MAGIC "LNN1"
 #define LNN_MAGIC_SIZE 4
 
+static int lnn_calc_out_dim(int in_dim, int kernel, int stride, int padding) {
+    int padded;
+    int numer;
+
+    if (in_dim <= 0 || kernel <= 0 || stride <= 0 || padding < 0) return -1;
+
+    padded = in_dim + 2 * padding;
+    if (padded < kernel) return -1;
+
+    numer = padded - kernel;
+    if ((numer % stride) != 0) return -1;
+
+    return (numer / stride) + 1;
+}
+
 int sequential_model_init(SequentialModel *model, int initial_capacity) {
     if (!model || initial_capacity <= 0) return -1;
 
@@ -34,6 +49,10 @@ int sequential_model_init(SequentialModel *model, int initial_capacity) {
     model->work_grad_b = NULL;
     model->work_grad_w_size = 0;
     model->work_grad_b_size = 0;
+    model->shape2d_width = 0;
+    model->shape2d_height = 0;
+    model->shape2d_channels = 0;
+    model->shape2d_valid = 0;
     return 0;
 }
 
@@ -93,6 +112,11 @@ int sequential_model_add_dense(SequentialModel *model,
 
     if (!model) return -1;
 
+    if (model->shape2d_valid) {
+        int expected = model->shape2d_width * model->shape2d_height * model->shape2d_channels;
+        if (expected != input_size) return -1;
+    }
+
     if (layer_plugin_dense_create(input_size, output_size, activation, &layer) != 0) {
         return -1;
     }
@@ -101,6 +125,8 @@ int sequential_model_add_dense(SequentialModel *model,
         layer_plugin_free(&layer);
         return -1;
     }
+
+    model->shape2d_valid = 0;
 
     return 0;
 }
@@ -120,6 +146,15 @@ int sequential_model_add_conv2d(SequentialModel *model,
 
     if (!model) return -1;
 
+    if (model->num_layers > 0) {
+        if (!model->shape2d_valid) return -1;
+        if (model->shape2d_width != input_width ||
+            model->shape2d_height != input_height ||
+            model->shape2d_channels != input_channels) {
+            return -1;
+        }
+    }
+
     if (layer_plugin_conv2d_create(input_width,
                                    input_height,
                                    input_channels,
@@ -138,6 +173,11 @@ int sequential_model_add_conv2d(SequentialModel *model,
         return -1;
     }
 
+    model->shape2d_width = lnn_calc_out_dim(input_width, kernel_width, stride, padding);
+    model->shape2d_height = lnn_calc_out_dim(input_height, kernel_height, stride, padding);
+    model->shape2d_channels = output_channels;
+    model->shape2d_valid = (model->shape2d_width > 0 && model->shape2d_height > 0) ? 1 : 0;
+
     return 0;
 }
 
@@ -153,6 +193,15 @@ int sequential_model_add_maxpool2d(SequentialModel *model,
     memset(&layer, 0, sizeof(LayerPlugin));
 
     if (!model) return -1;
+
+    if (model->num_layers > 0) {
+        if (!model->shape2d_valid) return -1;
+        if (model->shape2d_width != input_width ||
+            model->shape2d_height != input_height ||
+            model->shape2d_channels != channels) {
+            return -1;
+        }
+    }
 
     if (layer_plugin_maxpool2d_create(input_width,
                                       input_height,
@@ -170,7 +219,89 @@ int sequential_model_add_maxpool2d(SequentialModel *model,
         return -1;
     }
 
+    model->shape2d_width = lnn_calc_out_dim(input_width, pool_width, stride, padding);
+    model->shape2d_height = lnn_calc_out_dim(input_height, pool_height, stride, padding);
+    model->shape2d_channels = channels;
+    model->shape2d_valid = (model->shape2d_width > 0 && model->shape2d_height > 0) ? 1 : 0;
+
     return 0;
+}
+
+int sequential_model_add_flatten(SequentialModel *model) {
+    LayerPlugin layer;
+    int in_size;
+
+    if (!model || model->num_layers <= 0) return -1;
+
+    in_size = model->layers[model->num_layers - 1].output_size(
+        model->layers[model->num_layers - 1].ctx);
+    if (in_size <= 0) return -1;
+
+    memset(&layer, 0, sizeof(LayerPlugin));
+    if (layer_plugin_flatten_create(in_size, &layer) != 0) {
+        return -1;
+    }
+
+    if (sequential_model_add_layer(model, layer) != 0) {
+        layer_plugin_free(&layer);
+        return -1;
+    }
+
+    model->shape2d_valid = 0;
+    return 0;
+}
+
+int sequential_model_set_input_shape2d(SequentialModel *model,
+                                       int width,
+                                       int height,
+                                       int channels) {
+    if (!model || width <= 0 || height <= 0 || channels <= 0) return -1;
+    model->shape2d_width = width;
+    model->shape2d_height = height;
+    model->shape2d_channels = channels;
+    model->shape2d_valid = 1;
+    return 0;
+}
+
+int sequential_model_add_conv2d_simple(SequentialModel *model,
+                                       int input_channels,
+                                       int output_channels,
+                                       int kernel_size,
+                                       int stride) {
+    int padding;
+
+    if (!model || !model->shape2d_valid) return -1;
+    if (input_channels <= 0 || output_channels <= 0 || kernel_size <= 0 || stride <= 0) return -1;
+    if (model->shape2d_channels != input_channels) return -1;
+
+    padding = kernel_size / 2;
+
+    return sequential_model_add_conv2d(model,
+                                       model->shape2d_width,
+                                       model->shape2d_height,
+                                       input_channels,
+                                       output_channels,
+                                       kernel_size,
+                                       kernel_size,
+                                       stride,
+                                       padding,
+                                       ACT_RELU);
+}
+
+int sequential_model_add_maxpool2d_simple(SequentialModel *model,
+                                          int pool_size,
+                                          int stride) {
+    if (!model || !model->shape2d_valid) return -1;
+    if (pool_size <= 0 || stride <= 0) return -1;
+
+    return sequential_model_add_maxpool2d(model,
+                                          model->shape2d_width,
+                                          model->shape2d_height,
+                                          model->shape2d_channels,
+                                          pool_size,
+                                          pool_size,
+                                          stride,
+                                          0);
 }
 
 int sequential_model_forward(SequentialModel *model,

@@ -30,6 +30,10 @@ Conv/pool model building helpers:
 
 - `sequential_model_add_conv2d`
 - `sequential_model_add_maxpool2d`
+- `sequential_model_add_flatten`
+- `sequential_model_set_input_shape2d`
+- `sequential_model_add_conv2d_simple`
+- `sequential_model_add_maxpool2d_simple`
 
 ## Built-in sequential training
 
@@ -256,3 +260,114 @@ Keep RMSProp caches persistent across all training steps.
 	- `out_h = ((in_h + 2 * padding - pool_h) / stride) + 1`
 - Dimension checks are strict. If `(in + 2*padding - kernel_or_pool)` is not divisible by `stride`, layer creation returns `-1`.
 - When connecting to dense layers, flatten to `out_w * out_h * out_channels` (for conv) or `out_w * out_h * channels` (for pool).
+
+Short-form API example (stride as last arg):
+
+```c
+SequentialModel model;
+sequential_model_init(&model, 8);
+
+sequential_model_set_input_shape2d(&model, 28, 28, 1);
+sequential_model_add_conv2d_simple(&model, 1, 16, 3, 2); /* stride=2 */
+sequential_model_add_maxpool2d_simple(&model, 2, 2);
+```
+
+## Image dataset training (PGM)
+
+Use `image_processing.h` when training from image files.
+
+Main helpers:
+
+- `image_load_pgm`: load one grayscale PGM (`P2`/`P5`) as normalized float pixels.
+- `image_dataset_load_pgm_labeled`: load many image paths with integer labels into contiguous train arrays.
+- `image_dataset_load_pgm_manifest`: load dataset directly from a manifest text file.
+- `sequential_model_train_image_dataset`: train directly from `ImageDataset`.
+- `sequential_model_predict_pgm`: load one image + predict in one call.
+
+### Load more than 10 images into arrays
+
+```c
+const char *paths[] = {
+	"train/0/a0.pgm", "train/0/a1.pgm", "train/0/a2.pgm",
+	"train/1/b0.pgm", "train/1/b1.pgm", "train/1/b2.pgm",
+	"train/2/c0.pgm", "train/2/c1.pgm", "train/2/c2.pgm",
+	"train/3/d0.pgm", "train/3/d1.pgm", "train/3/d2.pgm"
+};
+
+int labels[] = {
+	0, 0, 0,
+	1, 1, 1,
+	2, 2, 2,
+	3, 3, 3
+};
+
+int num_samples = (int)(sizeof(paths) / sizeof(paths[0]));
+```
+
+You can scale this pattern to hundreds or thousands of entries.
+
+### Build dataset and train
+
+```c
+ImageDataset ds = {0};
+float final_loss = 0.0f;
+
+if (image_dataset_load_pgm_labeled(paths,
+								   labels,
+								   num_samples,
+								   4,     /* num_classes */
+								   28,
+								   28,
+								   &ds) != 0) {
+	/* handle error */
+}
+
+sequential_model_compile(&model,
+						 LOSS_BCE,
+						 OPTIMIZER_ADAM,
+						 0.001f,
+						 0.9f,
+						 0.999f);
+
+/* Wrapper API */
+sequential_model_train_image_dataset(&model, &ds, 20, 16, &final_loss);
+
+/* Equivalent generic API */
+sequential_model_train(&model,
+					   ds.inputs,
+					   ds.targets,
+					   ds.num_samples,
+					   ds.input_size,
+					   ds.target_size,
+					   20,
+					   16,
+					   &final_loss);
+
+image_dataset_free(&ds);
+```
+
+Manifest-based shortcut:
+
+```c
+image_dataset_load_pgm_manifest("data/train_manifest.txt",
+								10,
+								28,
+								28,
+								&ds);
+```
+
+Each manifest row is:
+
+```text
+relative/or/absolute/path.pgm 7
+```
+
+### Raw bytes to floats
+
+If you already have `uint8` image bytes in memory, convert them with:
+
+```c
+image_convert_u8_to_f32(src_u8, width * height, dst_f32);
+```
+
+This normalizes to `[0, 1]` and avoids duplicating conversion loops in user code.

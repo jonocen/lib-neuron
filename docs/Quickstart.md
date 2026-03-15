@@ -23,6 +23,7 @@ This builds:
 - `examples/simple_compact`
 - `examples/sequential_xor_plugin`
 - `examples/Other_Exaple`
+- `examples/mnist_tiny_pgm`
 
 ## 3) Run the examples
 
@@ -30,6 +31,14 @@ This builds:
 ./examples/simple_compact
 ./examples/sequential_xor_plugin
 ./examples/Other_Exaple
+```
+
+MNIST-style tiny example (out-of-box synthetic digits):
+
+```sh
+make mnist_tiny_pgm
+./examples/mnist_tiny_pgm
+./examples/mnist_tiny_pgm 25 32 0.001 24
 ```
 
 `Other_Exaple` is a compact layer-array training example.
@@ -63,3 +72,52 @@ Include all public APIs with:
 ```
 
 For full signatures and shape rules, see `docs/APIReference.md`.
+
+## 6) Train from image files (PGM)
+
+The library includes image helpers in `image_processing.h`.
+
+Typical flow:
+
+1. Build `const char *paths[]` and `int labels[]` for your images.
+2. Load them into an `ImageDataset` with one-hot labels.
+3. Compile your model.
+4. Train with either generic or image-specific helper.
+
+```c
+#include <lib-neuron.h>
+
+const char *paths[] = {
+	"data/0/img_0001.pgm",
+	"data/1/img_0002.pgm",
+	"data/2/img_0003.pgm",
+	/* ... many more ... */
+};
+int labels[] = {0, 1, 2 /* ... */};
+int num_samples = (int)(sizeof(paths) / sizeof(paths[0]));
+
+ImageDataset ds = {0};
+image_dataset_load_pgm_labeled(paths,
+							   labels,
+							   num_samples,
+							   10,      /* num classes */
+							   28,
+							   28,
+							   &ds);
+
+sequential_model_compile(&model,
+						 LOSS_BCE,
+						 OPTIMIZER_ADAM,
+						 0.001f,
+						 0.9f,
+						 0.999f);
+
+sequential_model_train_image_dataset(&model, &ds, 10, 16, NULL);
+
+image_dataset_free(&ds);
+```
+
+Notes:
+
+- All images in one dataset call must have the same `expected_width`/`expected_height`.
+- `image_load_pgm` supports grayscale PGM (`P2`, `P5`) and normalizes to `[0, 1]`.

@@ -29,6 +29,25 @@ int sequential_model_add_maxpool2d(SequentialModel *model,
                                    int pool_height,
                                    int stride,
                                    int padding);
+int sequential_model_add_flatten(SequentialModel *model);
+
+/* Set the current 2D input shape used by convenience conv/pool builders. */
+int sequential_model_set_input_shape2d(SequentialModel *model,
+                                       int width,
+                                       int height,
+                                       int channels);
+
+/* Convenience Conv2D builder with default padding=kernel_size/2 and ACT_RELU. */
+int sequential_model_add_conv2d_simple(SequentialModel *model,
+                                       int input_channels,
+                                       int output_channels,
+                                       int kernel_size,
+                                       int stride);
+
+/* Convenience MaxPool2D builder with square pool and padding=0. */
+int sequential_model_add_maxpool2d_simple(SequentialModel *model,
+                                          int pool_size,
+                                          int stride);
 
 int sequential_model_forward(SequentialModel *model,
                              const float *input,

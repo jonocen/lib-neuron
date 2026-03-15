@@ -77,6 +77,40 @@ What it demonstrates:
 - plugin dense layers via `sequential_model_add_dense`
 - framework-style flow: `sequential_model_compile` + `sequential_model_train` + `sequential_model_predict`
 
+## Example 3: tiny MNIST-style classifier (PGM)
+
+Source: `examples/mnist_tiny_pgm.c`
+
+Build:
+
+```sh
+make mnist_tiny_pgm
+```
+
+Run:
+
+```sh
+./examples/mnist_tiny_pgm
+```
+
+Optional args:
+
+```sh
+./examples/mnist_tiny_pgm [epochs] [batch_size] [lr] [samples_per_class]
+```
+
+What it demonstrates:
+
+- loading many labeled images through `image_dataset_load_pgm_labeled`
+- out-of-box synthetic digit dataset generation via `image_dataset_make_tiny_digits`
+- training a `28x28 -> 128 -> 64 -> 10` dense model
+- class decoding with `image_dataset_get_label` and `image_argmax`
+
+Notes:
+
+- No external dataset files are required for this example.
+- If you want real image files, use `image_dataset_load_pgm_manifest` / `image_dataset_load_pgm_labeled`.
+
 ## Conv2D + MaxPool2D snippet
 
 ```c

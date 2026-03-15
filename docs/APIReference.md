@@ -7,6 +7,7 @@ Scope:
 - `include/layers.h`
 - `include/lossfunctions.h`
 - `include/optimizers.h`
+- `include/image_processing.h`
 - `include/models.h` (umbrella)
 - `include/models_types.h`
 - `include/models_core.h`
@@ -192,6 +193,20 @@ Scope:
 `int sequential_model_add_maxpool2d(SequentialModel *model, int input_width, int input_height, int channels, int pool_width, int pool_height, int stride, int padding)`
 - Convenience helper that creates and appends a MaxPool2D plugin layer.
 
+`int sequential_model_add_flatten(SequentialModel *model)`
+- Appends an explicit flatten layer (identity over contiguous memory layout).
+- Useful to mark transition from conv/pool feature maps to dense layers.
+
+`int sequential_model_set_input_shape2d(SequentialModel *model, int width, int height, int channels)`
+- Stores current feature-map shape for short-form conv/pool builders.
+
+`int sequential_model_add_conv2d_simple(SequentialModel *model, int input_channels, int output_channels, int kernel_size, int stride)`
+- Short-form Conv2D builder using tracked shape.
+- Uses `padding = kernel_size / 2` and `ACT_RELU`.
+
+`int sequential_model_add_maxpool2d_simple(SequentialModel *model, int pool_size, int stride)`
+- Short-form MaxPool2D builder using tracked shape and `padding = 0`.
+
 ### Inference and initialization
 
 `int sequential_model_forward(SequentialModel *model, const float *input, float *output)`
@@ -289,3 +304,64 @@ Most `-1` returns are caused by:
 - Architecture mismatch between serialized `.lnn` data and target model.
 - Missing optimizer state for Adam/RMSProp training helpers.
 - Memory allocation or file I/O failure.
+
+## `image_processing.h`
+
+### Image dataset struct
+
+`ImageDataset`
+- `inputs`: contiguous normalized input data (`num_samples * input_size`).
+- `targets`: contiguous one-hot targets (`num_samples * target_size`).
+- `num_samples`: number of samples.
+- `image_width`, `image_height`, `image_channels`: image metadata.
+- `input_size`: flattened input size per sample.
+- `target_size`: classes/target vector size per sample.
+
+### Pixel conversion helper
+
+`int image_convert_u8_to_f32(const unsigned char *src, int element_count, float *dst)`
+- Converts byte pixels (`0..255`) to normalized float pixels (`0..1`).
+
+### Load one PGM image
+
+`int image_load_pgm(const char *file_path, float **out_pixels, int *out_width, int *out_height)`
+- Loads grayscale PGM file (`P2` or `P5`) into a newly allocated normalized float buffer.
+- Caller owns `*out_pixels` and must free it with `free()`.
+
+### Build labeled dataset from many PGM images
+
+`int image_dataset_load_pgm_labeled(const char **image_paths, const int *labels, int num_samples, int num_classes, int expected_width, int expected_height, ImageDataset *out_dataset)`
+- Loads multiple PGM files into one contiguous training dataset.
+- Converts each integer label to one-hot vector of size `num_classes`.
+- Validates image dimensions against `expected_width/expected_height`.
+
+`int image_dataset_load_pgm_manifest(const char *manifest_path, int num_classes, int expected_width, int expected_height, ImageDataset *out_dataset)`
+- Loads a dataset from a text manifest file with rows: `<image_path> <label>`.
+- Skips blank/comment lines and ignores rows with invalid labels.
+
+`int image_dataset_make_tiny_digits(ImageDataset *out_dataset, int samples_per_class, int width, int height, unsigned int seed)`
+- Builds a synthetic 10-class tiny digit dataset in memory (no external files required).
+- Useful for out-of-box training and API smoke tests.
+
+### Free dataset memory
+
+`void image_dataset_free(ImageDataset *dataset)`
+- Frees internal `inputs` and `targets` buffers and resets fields.
+
+### Class selection helper
+
+`int image_argmax(const float *scores, int count, int *out_index)`
+- Returns the index of the largest score value (useful for class prediction).
+
+`int image_dataset_get_label(const ImageDataset *dataset, int sample_index, int *out_label)`
+- Reads one sample's class label from one-hot targets in `dataset`.
+
+### Train with image dataset
+
+`int sequential_model_train_image_dataset(SequentialModel *model, const ImageDataset *dataset, int epochs, int batch_size, float *final_loss_out)`
+- Convenience wrapper around `sequential_model_train` using `dataset` buffers.
+
+### Predict directly from one PGM file
+
+`int sequential_model_predict_pgm(SequentialModel *model, const char *file_path, int expected_width, int expected_height, float *output)`
+- Loads one PGM image, validates dimensions, and runs `sequential_model_predict`.
