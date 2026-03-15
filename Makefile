@@ -9,10 +9,14 @@ SRC := src/matrixcalculation.c \
 	src/layers.c \
        src/lossfunctions.c \
        src/optimizers.c \
-       src/models.c
+	src/models_internal.c \
+	src/models_core.c \
+	src/models_train.c \
+	src/models_state.c \
+	src/models_legacy.c
 
-OBJ := matrixcalculation.o layers.o lossfunctions.o optimizers.o models.o
-PIC_OBJ := matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o models.pic.o
+OBJ := matrixcalculation.o layers.o lossfunctions.o optimizers.o models_internal.o models_core.o models_train.o models_state.o models_legacy.o
+PIC_OBJ := matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o models_internal.pic.o models_core.pic.o models_train.pic.o models_state.pic.o models_legacy.pic.o
 LIB := libneuron.a
 SHARED_LIB := libneuron.so
 EXAMPLE_BINARIES := $(patsubst examples/%.c,examples/%,$(wildcard examples/*.c))
@@ -49,7 +53,19 @@ layers.o: src/layers.c include/layers.h include/matrixcalculation.h
 optimizers.o: src/optimizers.c include/optimizers.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-models.o: src/models.c include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
+models_internal.o: src/models_internal.c include/models_internal.h include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+models_core.o: src/models_core.c include/models_internal.h include/models.h include/models_core.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+models_train.o: src/models_train.c include/models_internal.h include/models.h include/models_training.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+models_state.o: src/models_state.c include/models_internal.h include/models.h include/models_training.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+models_legacy.o: src/models_legacy.c include/models_internal.h include/models.h include/models_legacy.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 matrixcalculation.pic.o: src/matrixcalculation.c include/matrixcalculation.h
@@ -64,7 +80,19 @@ layers.pic.o: src/layers.c include/layers.h include/matrixcalculation.h
 optimizers.pic.o: src/optimizers.c include/optimizers.h
 	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
 
-models.pic.o: src/models.c include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
+models_internal.pic.o: src/models_internal.c include/models_internal.h include/models.h include/matrixcalculation.h include/lossfunctions.h include/optimizers.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+models_core.pic.o: src/models_core.c include/models_internal.h include/models.h include/models_core.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+models_train.pic.o: src/models_train.c include/models_internal.h include/models.h include/models_training.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+models_state.pic.o: src/models_state.c include/models_internal.h include/models.h include/models_training.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+models_legacy.pic.o: src/models_legacy.c include/models_internal.h include/models.h include/models_legacy.h
 	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
 
 clean:
