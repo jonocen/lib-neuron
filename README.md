@@ -2,10 +2,6 @@
 
 `lib-neuron` is a lightweight C neural-network library focused on small projects and educational use.
 
-## Why AI and where is it
-
-!!The Doc is AI made because my english is very Bad, Fixed in future!!
-
 ## Modules
 
 - `matrixcalculation`: activations, dense layers, conv2d, maxpool2d
@@ -45,6 +41,8 @@ Model APIs are split into focused headers while keeping compatibility:
 - `docs/AddLayerAndPluginLayer.md`
 - `docs/FirstScript.md`
 - `docs/APIReference.md`
+
+docs are ai generated!
 
 For image-based training examples (including loading many files into arrays), see `docs/Training.md`.
 
