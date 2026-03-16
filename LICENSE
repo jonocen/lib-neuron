@@ -1,0 +1,59 @@
+lib-neuron Non-Commercial Source License (NC-SL) v1.0
+
+Copyright (c) 2026 Jonocen
+
+1. Definitions
+
+"Project" means the lib-neuron source code repository and its files.
+"Original Repository" means: https://github.com/Jonocen
+"You" means any person or entity using, copying, modifying, or sharing the Project.
+"Commercial Use" means selling, licensing for a fee, paid distribution, paid access,
+or any use where the Project (or a modified version) is directly monetized.
+
+2. Permissions (Non-Commercial)
+
+Subject to the conditions below, You are allowed to:
+- Use the Project for personal, educational, research, and other non-commercial purposes.
+- Modify the Project.
+- Contribute changes back to the Project.
+- Share original or modified source code, only under this same license.
+
+3. Conditions for Sharing Source Code
+
+If You share, publish, or redistribute the Project (original or modified), You must:
+- Keep this LICENSE file in the distributed source.
+- Include the file named "Contributers" in the distributed source.
+- Provide a clear reference to the Original Repository (https://github.com/Jonocen)
+  in a visible place such as README, project description, or distribution page.
+- State whether You modified the source.
+
+4. Commercial Restriction
+
+Commercial Use is not allowed.
+You may not sell, sublicense, rent, or charge money for the Project,
+for modified versions, or for copies/distributions of either.
+
+5. No Warranty
+
+THE PROJECT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+6. Liability
+
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE PROJECT OR THE USE OR OTHER DEALINGS
+IN THE PROJECT.
+
+7. Acceptance
+
+By using, modifying, or sharing the Project, You agree to this license.
+By downloading, updating to, installing, using, modifying, or sharing a newer
+version of the Project, You agree to the license terms that accompany that
+newer version.
+
+8. Licensor Right to Change License
+
+Jonocen (the original author/licensor) may change, replace, or update this license
+at any time for future versions of the Project.

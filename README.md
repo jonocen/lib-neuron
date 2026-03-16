@@ -73,6 +73,26 @@ Clean artifacts:
 make clean
 ```
 
+## License
+
+This project is licensed under a custom non-commercial license.
+See `LICENSE` for the full text.
+
+Summary:
+- You can use, modify, and contribute to the project for non-commercial use.
+- If you share the source (original or modified), you must keep `LICENSE`, include the `Contributers` file, and reference the original repo: `https://github.com/Jonocen/lib-neuron`.
+- Selling or charging money for this code (or modified versions) is not allowed.
+
+| Action | Allowed? | Condition |
+|---|---|---|
+| Use privately (learning, hobby, research) | Yes | Must be non-commercial |
+| Modify the source code | Yes | Must stay non-commercial |
+| Contribute changes back | Yes | Follow project contribution rules |
+| Share original source | Yes | Include `LICENSE`, include `Contributers`, and reference `https://github.com/Jonocen/lib-neuron` |
+| Share modified source | Yes | Include `LICENSE`, include `Contributers`, reference `https://github.com/Jonocen/lib-neuron`, and state that you changed the code |
+| Sell the code | No | Not permitted |
+| Charge money for access/distribution | No | Not permitted |
+
 ## Compile your own program
 
 Use the static archive directly for the simplest setup:
