@@ -3,6 +3,7 @@
 This is the complete public API reference for `lib-neuron`.
 
 Scope:
+- `include/activationfunctions.h`
 - `include/matrixcalculation.h`
 - `include/layers.h`
 - `include/lossfunctions.h`
@@ -43,15 +44,15 @@ Scope:
 - `LOSS_BCE`
 - `LOSS_HUBER`
 
-## `matrixcalculation.h`
-
-### Activation functions
+## `activationfunctions.h`
 
 `float act_apply(float x, Activation a)`
 - Applies activation `a` to scalar `x`.
 
 `float act_deriv(float x, Activation a)`
 - Returns derivative of activation `a` at scalar `x`.
+
+## `matrixcalculation.h`
 
 ### Dense layer functions
 

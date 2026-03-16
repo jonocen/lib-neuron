@@ -5,7 +5,8 @@ RELEASE := -O2
 DEBUG   := -O0 -g
 PIC     := -fPIC
 
-SRC := src/matrixcalculation.c \
+SRC := src/activationfunctions.c \
+	src/matrixcalculation.c \
 	src/layers.c \
        src/lossfunctions.c \
        src/optimizers.c \
@@ -16,8 +17,8 @@ SRC := src/matrixcalculation.c \
 	src/models_state.c \
 	src/models_legacy.c
 
-OBJ := matrixcalculation.o layers.o lossfunctions.o optimizers.o image_processing.o models_internal.o models_core.o models_train.o models_state.o models_legacy.o
-PIC_OBJ := matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o image_processing.pic.o models_internal.pic.o models_core.pic.o models_train.pic.o models_state.pic.o models_legacy.pic.o
+OBJ := activationfunctions.o matrixcalculation.o layers.o lossfunctions.o optimizers.o image_processing.o models_internal.o models_core.o models_train.o models_state.o models_legacy.o
+PIC_OBJ := activationfunctions.pic.o matrixcalculation.pic.o layers.pic.o lossfunctions.pic.o optimizers.pic.o image_processing.pic.o models_internal.pic.o models_core.pic.o models_train.pic.o models_state.pic.o models_legacy.pic.o
 LIB := libneuron.a
 SHARED_LIB := libneuron.so
 EXAMPLE_BINARIES := $(patsubst examples/%.c,examples/%,$(wildcard examples/*.c))
@@ -42,7 +43,10 @@ $(LIB): $(OBJ)
 $(SHARED_LIB): $(PIC_OBJ)
 	$(CC) -shared -o $@ $^ -lm
 
-matrixcalculation.o: src/matrixcalculation.c include/matrixcalculation.h
+activationfunctions.o: src/activationfunctions.c include/activationfunctions.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+matrixcalculation.o: src/matrixcalculation.c include/matrixcalculation.h include/activationfunctions.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 lossfunctions.o: src/lossfunctions.c include/lossfunctions.h
@@ -72,7 +76,10 @@ models_state.o: src/models_state.c include/models_internal.h include/models.h in
 models_legacy.o: src/models_legacy.c include/models_internal.h include/models.h include/models_legacy.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-matrixcalculation.pic.o: src/matrixcalculation.c include/matrixcalculation.h
+activationfunctions.pic.o: src/activationfunctions.c include/activationfunctions.h
+	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
+
+matrixcalculation.pic.o: src/matrixcalculation.c include/matrixcalculation.h include/activationfunctions.h
 	$(CC) $(CFLAGS) $(RELEASE) $(PIC) -c $< -o $@
 
 lossfunctions.pic.o: src/lossfunctions.c include/lossfunctions.h

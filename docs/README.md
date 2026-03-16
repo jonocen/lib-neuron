@@ -13,6 +13,7 @@ They also cover image data helpers for loading PGM files and training from in-me
 - [Training](Training.md)
 - [Add an Optimizer](AddOptimizer.md)
 - [Add a Loss Function](AddLossFunction.md)
+- [Add an Activation Function](AddActivationFunction.md)
 - [Add a Layer + Plugin Layer](AddLayerAndPluginLayer.md)
 - [Use the Library + First Script](FirstScript.md)
 
